@@ -53,6 +53,11 @@ struct iOSContentView: View {
                 WishlistView()
             }
             .tabItem { Label("위시리스트", systemImage: "heart") }.tag(4)
+
+            NavigationStack {
+                NotesView()
+            }
+            .tabItem { Label("노트", systemImage: "note.text") }.tag(5)
         }
         .onAppear { timerManager.setup(context: modelContext) }
     }
