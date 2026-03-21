@@ -1163,48 +1163,62 @@ struct AddTransactionSheet: View {
                     Divider().padding(.horizontal, 16)
 
                     // MARK: 구매처
-                    infoRow(label: "구매처") {
-                        Menu {
-                            Button { withAnimation { store = "" } } label: {
-                                Label("없음", systemImage: "xmark")
-                            }
-                            Divider()
-                            ForEach(Transaction.stores.filter { $0 != "직접입력" }, id: \.self) { s in
-                                Button { withAnimation { store = s } } label: {
-                                    Label(s, systemImage: Transaction.storeIcon[s] ?? "bag")
+                    infoRow(label: "판매처") {
+                        HStack(spacing: 8) {
+                            Menu {
+                                Button { withAnimation { store = "" } } label: {
+                                    Label("없음", systemImage: "xmark")
                                 }
-                            }
-                            Divider()
-                            Button { withAnimation { store = "직접입력" } } label: {
-                                Label("직접입력", systemImage: "pencil")
-                            }
-                        } label: {
-                            HStack(spacing: 5) {
-                                if store.isEmpty {
-                                    Text("선택 안 함")
-                                        .font(.system(size: 13))
+                                Divider()
+                                ForEach(Transaction.stores, id: \.self) { s in
+                                    Button { withAnimation { store = s } } label: {
+                                        Label(s, systemImage: Transaction.storeIcon[s] ?? "bag")
+                                    }
+                                }
+                                if !customStores.isEmpty {
+                                    Divider()
+                                    ForEach(customStores, id: \.self) { s in
+                                        Button { withAnimation { store = s } } label: {
+                                            Label(s, systemImage: "tag")
+                                        }
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 5) {
+                                    if store.isEmpty {
+                                        Text("선택 안 함")
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(.secondary)
+                                    } else {
+                                        Image(systemName: Transaction.storeIcon[store] ?? "tag")
+                                            .font(.system(size: 11))
+                                        Text(store)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(.primary)
+                                    }
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.system(size: 10))
                                         .foregroundStyle(.secondary)
-                                } else {
-                                    Image(systemName: Transaction.storeIcon[store] ?? "bag")
-                                        .font(.system(size: 11))
-                                    Text(store == "직접입력" ? (customStore.isEmpty ? "직접입력" : customStore) : store)
-                                        .font(.system(size: 13, weight: .medium))
-                                        .foregroundStyle(.primary)
                                 }
+                                .padding(.horizontal, 10).padding(.vertical, 5)
+                                .background(Color.secondary.opacity(0.1))
+                                .clipShape(RoundedRectangle(cornerRadius: 7))
+                                .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.secondary.opacity(0.25), lineWidth: 1))
                             }
-                            .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(Color.secondary.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 7))
-                            .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.secondary.opacity(0.25), lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
-                    }
+                            .buttonStyle(.plain)
 
-                    if store == "직접입력" {
-                        TextField("구매처 직접 입력", text: $customStore)
-                            .font(.system(size: 14))
-                            .padding(.horizontal, 14).padding(.vertical, 10)
-                            .padding(.horizontal, 16)
+                            Button { showManageStores = true } label: {
+                                Image(systemName: "plus.circle")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .sheet(isPresented: $showManageStores, onDismiss: {
+                        customStores = UserDefaults.standard.stringArray(forKey: "customStores") ?? []
+                    }) {
+                        ManageStoresSheet()
                     }
 
                     Divider().padding(.horizontal, 16)
