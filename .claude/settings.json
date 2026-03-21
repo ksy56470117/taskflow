@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); [ -z \"$f\" ] && exit 0; cd \"/Users/a1/Library/Mobile Documents/com~apple~CloudDocs/TaskFlow\" 2>/dev/null || exit 0; git add \"$f\" 2>/dev/null; git diff --cached --quiet && exit 0; git commit -m \"Auto-save: $(basename \"$f\")\" 2>/dev/null || true",
+            "statusMessage": "GitHub에 저장 중...",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}
