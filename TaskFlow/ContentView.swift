@@ -141,6 +141,7 @@ struct ThingsSidebar: View {
     @Binding var selection: SidebarItem?
     @Binding var showAddArea: Bool
     @Binding var showAddProject: Area?
+    var onTap: ((SidebarItem) -> Void)? = nil
 
     var body: some View {
         List(selection: $selection) {
@@ -149,24 +150,31 @@ struct ThingsSidebar: View {
                 Label("오늘", systemImage: "star.fill")
                     .foregroundStyle(.primary)
                     .tag(SidebarItem.today)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.today) })
                 Label("통계", systemImage: "chart.bar.fill")
                     .foregroundStyle(.primary)
                     .tag(SidebarItem.stats)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.stats) })
                 Label("캘린더", systemImage: "calendar")
                     .foregroundStyle(.primary)
                     .tag(SidebarItem.calendar)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.calendar) })
                 Label("학습 계획", systemImage: "books.vertical.fill")
                     .foregroundStyle(.primary)
                     .tag(SidebarItem.studyPlan)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.studyPlan) })
                 Label("가계부", systemImage: "wonsign.circle.fill")
                     .foregroundStyle(.primary)
                     .tag(SidebarItem.spending)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.spending) })
                 Label("위시리스트", systemImage: "heart")
                     .foregroundStyle(.primary)
                     .tag(SidebarItem.wishlist)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.wishlist) })
                 Label("노트", systemImage: "note.text")
                     .foregroundStyle(.primary)
                     .tag(SidebarItem.notes)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.notes) })
             }
 
             // Area별 프로젝트
