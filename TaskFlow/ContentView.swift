@@ -158,6 +158,9 @@ struct ThingsSidebar: View {
                 Label("위시리스트", systemImage: "heart")
                     .foregroundStyle(.primary)
                     .tag(SidebarItem.wishlist)
+                Label("노트", systemImage: "note.text")
+                    .foregroundStyle(.primary)
+                    .tag(SidebarItem.notes)
             }
 
             // Area별 프로젝트
