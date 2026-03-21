@@ -298,12 +298,12 @@ struct CalendarAddTaskSheet: View {
     }
 
     func submit() {
-        guard let project = selectedProject,
-              !title.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        let task = Task(title: title.trimmingCharacters(in: .whitespaces), project: project)
+        let trimmed = title.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        let task = Task(title: trimmed, project: selectedProject)
         task.dueDate = date
         modelContext.insert(task)
-        project.tasks.append(task)
+        selectedProject?.tasks.append(task)
         try? modelContext.save()
         dismiss()
     }
