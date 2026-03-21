@@ -5,6 +5,7 @@ struct CalendarView: View {
     @Query private var projects: [Project]
     @State private var selectedDate = Date()
     @State private var displayMonth = Date()
+    @State private var showAddTask = false
 
     var calendar: Calendar { Calendar.current }
     var allTasks: [Task] { projects.flatMap { $0.tasks } }
