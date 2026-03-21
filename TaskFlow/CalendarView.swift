@@ -293,10 +293,7 @@ struct CalendarAddTaskSheet: View {
                         .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
-            .onAppear {
-                focused = true
-                selectedProject = sortedProjects.first
-            }
+            .onAppear { focused = true }
         }
     }
 
