@@ -178,22 +178,48 @@ class Transaction {
         return (type == "income" ? "+" : "-") + str + "원"
     }
 
-    static let expenseCategories = ["식비", "교통", "쇼핑", "문화/여가", "의료", "통신", "주거", "교육", "기타"]
-    static let incomeCategories  = ["급여", "용돈", "부업", "기타"]
-    static let paymentMethods    = ["카드", "현금", "계좌이체"]
+    static let expenseCategories = [
+        "식비", "카페/디저트", "배달", "교통", "쇼핑", "온라인쇼핑",
+        "문화/여가", "의료", "미용/뷰티", "운동/헬스", "통신", "구독서비스",
+        "주거", "교육", "여행", "반려동물", "보험", "기타"
+    ]
+    static let incomeCategories  = ["급여", "용돈", "부업", "투자수익", "환급", "기타"]
+    static let paymentMethods    = ["카드", "현금", "계좌이체", "페이"]
+
+    // 구매처/플랫폼
+    static let stores = [
+        "쿠팡", "네이버쇼핑", "무신사", "쿠팡이츠", "배달의민족", "요기요",
+        "올리브영", "다이소", "이마트", "홈플러스", "마켓컬리", "지그재그",
+        "에이블리", "29CM", "SSG", "롯데온", "카카오", "직접입력"
+    ]
+    static let storeIcon: [String: String] = [
+        "쿠팡": "shippingbox", "네이버쇼핑": "magnifyingglass", "무신사": "tshirt",
+        "쿠팡이츠": "fork.knife.circle", "배달의민족": "bicycle", "요기요": "takeoutbag.and.cup.and.straw",
+        "올리브영": "sparkles", "다이소": "bag", "이마트": "cart", "홈플러스": "storefront",
+        "마켓컬리": "leaf", "지그재그": "tag", "에이블리": "hanger", "29CM": "bag.fill",
+        "SSG": "building.2", "롯데온": "building", "카카오": "bubble.left"
+    ]
 
     static let categoryIcon: [String: String] = [
-        "식비": "fork.knife", "교통": "car", "쇼핑": "bag",
-        "문화/여가": "ticket", "의료": "cross.case", "통신": "wifi",
-        "주거": "house", "교육": "graduationcap", "기타": "ellipsis.circle",
-        "급여": "banknote", "용돈": "gift", "부업": "briefcase"
+        "식비": "fork.knife", "카페/디저트": "cup.and.saucer", "배달": "bicycle",
+        "교통": "car", "쇼핑": "bag", "온라인쇼핑": "cart",
+        "문화/여가": "ticket", "의료": "cross.case", "미용/뷰티": "sparkles",
+        "운동/헬스": "figure.run", "통신": "wifi", "구독서비스": "arrow.clockwise.circle",
+        "주거": "house", "교육": "graduationcap", "여행": "airplane",
+        "반려동물": "pawprint", "보험": "shield", "기타": "ellipsis.circle",
+        "급여": "banknote", "용돈": "gift", "부업": "briefcase",
+        "투자수익": "chart.line.uptrend.xyaxis", "환급": "arrow.uturn.left", "기타": "ellipsis.circle"
     ]
 
     static let categoryColor: [String: String] = [
-        "식비": "FF6B6B", "교통": "4ECDC4", "쇼핑": "A78BFA",
-        "문화/여가": "F59E0B", "의료": "EF4444", "통신": "3B82F6",
-        "주거": "10B981", "교육": "6366F1", "기타": "9CA3AF",
-        "급여": "22C55E", "용돈": "84CC16", "부업": "F97316"
+        "식비": "FF6B6B", "카페/디저트": "C084FC", "배달": "F97316",
+        "교통": "4ECDC4", "쇼핑": "A78BFA", "온라인쇼핑": "818CF8",
+        "문화/여가": "F59E0B", "의료": "EF4444", "미용/뷰티": "F472B6",
+        "운동/헬스": "34D399", "통신": "3B82F6", "구독서비스": "6366F1",
+        "주거": "10B981", "교육": "8B5CF6", "여행": "0EA5E9",
+        "반려동물": "FCD34D", "보험": "94A3B8", "기타": "9CA3AF",
+        "급여": "22C55E", "용돈": "84CC16", "부업": "F97316",
+        "투자수익": "06B6D4", "환급": "10B981"
     ]
 }
 
