@@ -146,6 +146,191 @@ class SchoolEvent {
     }
 }
 
+// MARK: - Transaction (가계부 거래)
+@Model
+class Transaction {
+    var id: UUID
+    var amount: Int
+    var type: String          // "income" | "expense"
+    var category: String
+    var paymentMethod: String // "카드" | "현금" | "계좌이체"
+    var memo: String
+    var date: Date
+
+    init(amount: Int, type: String, category: String, paymentMethod: String = "카드", memo: String = "", date: Date = Date()) {
+        self.id = UUID()
+        self.amount = amount
+        self.type = type
+        self.category = category
+        self.paymentMethod = paymentMethod
+        self.memo = memo
+        self.date = date
+    }
+
+    var formattedAmount: String {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        let str = f.string(from: NSNumber(value: amount)) ?? "\(amount)"
+        return (type == "income" ? "+" : "-") + str + "원"
+    }
+
+    static let expenseCategories = ["식비", "교통", "쇼핑", "문화/여가", "의료", "통신", "주거", "교육", "기타"]
+    static let incomeCategories  = ["급여", "용돈", "부업", "기타"]
+    static let paymentMethods    = ["카드", "현금", "계좌이체"]
+
+    static let categoryIcon: [String: String] = [
+        "식비": "fork.knife", "교통": "car", "쇼핑": "bag",
+        "문화/여가": "ticket", "의료": "cross.case", "통신": "wifi",
+        "주거": "house", "교육": "graduationcap", "기타": "ellipsis.circle",
+        "급여": "banknote", "용돈": "gift", "부업": "briefcase"
+    ]
+
+    static let categoryColor: [String: String] = [
+        "식비": "FF6B6B", "교통": "4ECDC4", "쇼핑": "A78BFA",
+        "문화/여가": "F59E0B", "의료": "EF4444", "통신": "3B82F6",
+        "주거": "10B981", "교육": "6366F1", "기타": "9CA3AF",
+        "급여": "22C55E", "용돈": "84CC16", "부업": "F97316"
+    ]
+}
+
+// MARK: - MonthlyBudget (월 예산)
+@Model
+class MonthlyBudget {
+    var id: UUID
+    var category: String
+    var limitAmount: Int
+    var yearMonth: Int   // yyyyMM 형식 (예: 202603)
+
+    init(category: String, limitAmount: Int, yearMonth: Int) {
+        self.id = UUID()
+        self.category = category
+        self.limitAmount = limitAmount
+        self.yearMonth = yearMonth
+    }
+}
+
+// MARK: - SavingsAccount (적금 계좌)
+@Model
+class SavingsAccount {
+    var id: UUID
+    var name: String          // 예: "청년희망적금"
+    var bank: String          // 예: "국민은행"
+    var monthlyAmount: Int    // 월 납입액
+    var targetAmount: Int     // 목표 금액
+    var startDate: Date
+    var endDate: Date         // 만기일
+    var interestRate: Double  // 금리 (연, %)
+    var memo: String
+    var payments: [SavingsPayment]
+
+    init(name: String, bank: String = "", monthlyAmount: Int = 0,
+         targetAmount: Int = 0, startDate: Date = Date(),
+         endDate: Date = Date(), interestRate: Double = 0, memo: String = "") {
+        self.id = UUID()
+        self.name = name
+        self.bank = bank
+        self.monthlyAmount = monthlyAmount
+        self.targetAmount = targetAmount
+        self.startDate = startDate
+        self.endDate = endDate
+        self.interestRate = interestRate
+        self.memo = memo
+        self.payments = []
+    }
+
+    /// 지금까지 납입한 총액
+    var totalPaid: Int { payments.reduce(0) { $0 + $1.amount } }
+
+    /// 목표 대비 진행률 (0.0 ~ 1.0)
+    var progressRatio: Double {
+        guard targetAmount > 0 else { return 0 }
+        return min(Double(totalPaid) / Double(targetAmount), 1.0)
+    }
+
+    /// 만기까지 남은 달 수
+    var remainingMonths: Int {
+        let cal = Calendar.current
+        let diff = cal.dateComponents([.month], from: Date(), to: endDate)
+        return max(diff.month ?? 0, 0)
+    }
+
+    /// 이번 달 납입 여부
+    var isPaidThisMonth: Bool {
+        let cal = Calendar.current
+        return payments.contains { cal.isDate($0.date, equalTo: Date(), toGranularity: .month) }
+    }
+
+    /// 전체 납입 기간 (월 수)
+    var totalMonths: Int {
+        let cal = Calendar.current
+        let diff = cal.dateComponents([.month], from: startDate, to: endDate)
+        return max((diff.month ?? 0) + 1, 1)
+    }
+}
+
+// MARK: - SavingsPayment (적금 납입 기록)
+@Model
+class SavingsPayment {
+    var id: UUID
+    var amount: Int
+    var date: Date
+    var memo: String
+    var account: SavingsAccount?
+
+    init(amount: Int, date: Date = Date(), memo: String = "", account: SavingsAccount? = nil) {
+        self.id = UUID()
+        self.amount = amount
+        self.date = date
+        self.memo = memo
+        self.account = account
+    }
+}
+
+// MARK: - WishItem (위시리스트)
+@Model
+class WishItem {
+    var id: UUID
+    var name: String
+    var category: String     // "전자기기" | "패션" | "도서" | "뷰티" | "인테리어" | "식품" | "기타"
+    var store: String
+    var price: Int
+    var url: String
+    var notes: String
+    var isPurchased: Bool
+    var createdAt: Date
+
+    init(name: String, category: String = "기타", store: String = "", price: Int = 0, url: String = "", notes: String = "") {
+        self.id = UUID()
+        self.name = name
+        self.category = category
+        self.store = store
+        self.price = price
+        self.url = url
+        self.notes = notes
+        self.isPurchased = false
+        self.createdAt = Date()
+    }
+
+    var formattedPrice: String {
+        if price == 0 { return "가격 미정" }
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        return (f.string(from: NSNumber(value: price)) ?? "\(price)") + "원"
+    }
+
+    static let categories = ["전자기기", "패션", "도서", "뷰티", "인테리어", "식품", "기타"]
+
+    static let categoryIcon: [String: String] = [
+        "전자기기": "desktopcomputer",
+        "패션":    "tshirt",
+        "도서":    "book.closed",
+        "뷰티":    "sparkles",
+        "인테리어": "house",
+        "식품":    "fork.knife",
+        "기타":    "tag"
+    ]
+}
+
 // MARK: - StudyPlan (학습 계획)
 @Model
 class StudyPlan {

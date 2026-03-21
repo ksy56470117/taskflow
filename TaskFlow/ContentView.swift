@@ -43,6 +43,16 @@ struct iOSContentView: View {
                 CalendarView().navigationTitle("캘린더").navigationBarTitleDisplayMode(.large)
             }
             .tabItem { Label("캘린더", systemImage: "calendar") }.tag(2)
+
+            NavigationStack {
+                SpendingView()
+            }
+            .tabItem { Label("가계부", systemImage: "wonsign.circle") }.tag(3)
+
+            NavigationStack {
+                WishlistView()
+            }
+            .tabItem { Label("위시리스트", systemImage: "heart") }.tag(4)
         }
         .onAppear { timerManager.setup(context: modelContext) }
     }
@@ -79,6 +89,10 @@ struct MacContentView: View {
                     CalendarView()
                 case .studyPlan:
                     StudyPlanListView()
+                case .spending:
+                    SpendingView()
+                case .wishlist:
+                    WishlistView()
                 case .project(let id):
                     if let project = projects.first(where: { $0.id == id }) {
                         ProjectDetailView(project: project, timerManager: timerManager)
@@ -102,7 +116,7 @@ struct MacContentView: View {
 
 // MARK: - Sidebar Item
 enum SidebarItem: Hashable {
-    case today, stats, calendar, studyPlan
+    case today, stats, calendar, studyPlan, spending, wishlist
     case area(UUID)
     case project(UUID)
 }
@@ -131,6 +145,12 @@ struct ThingsSidebar: View {
                 Label("학습 계획", systemImage: "books.vertical.fill")
                     .foregroundStyle(.primary)
                     .tag(SidebarItem.studyPlan)
+                Label("가계부", systemImage: "wonsign.circle.fill")
+                    .foregroundStyle(.primary)
+                    .tag(SidebarItem.spending)
+                Label("위시리스트", systemImage: "heart")
+                    .foregroundStyle(.primary)
+                    .tag(SidebarItem.wishlist)
             }
 
             // Area별 프로젝트

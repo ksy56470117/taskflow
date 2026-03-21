@@ -8,9 +8,12 @@ struct TaskFlowApp: App {
     init() {
         let schema = Schema([
             Area.self, Project.self, Task.self, TimeEntry.self,
-            StudyPlan.self, StudySession.self, SchoolEvent.self
+            StudyPlan.self, StudySession.self, SchoolEvent.self,
+            WishItem.self, Transaction.self, MonthlyBudget.self,
+            SavingsAccount.self, SavingsPayment.self
         ])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let storeURL = Self.resolveStoreURL()
+        let config = ModelConfiguration(schema: schema, url: storeURL)
         do {
             container = try ModelContainer(for: schema, configurations: config)
         } catch {
@@ -24,6 +27,21 @@ struct TaskFlowApp: App {
             ctx.insert(school)
             try? ctx.save()
             UserDefaults.standard.set(true, forKey: "didSeedSchoolArea")
+        }
+    }
+
+    static func resolveStoreURL() -> URL {
+        let fm = FileManager.default
+        // iCloud Drive 안 TaskFlow 폴더에 데이터 저장
+        let iCloudData = fm.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/TaskFlow/AppData")
+        do {
+            try fm.createDirectory(at: iCloudData, withIntermediateDirectories: true)
+            return iCloudData.appendingPathComponent("taskflow.sqlite")
+        } catch {
+            // iCloud Drive 접근 실패 시 로컬로 fallback
+            let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            return appSupport.appendingPathComponent("taskflow.sqlite")
         }
     }
 
