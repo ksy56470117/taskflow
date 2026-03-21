@@ -341,8 +341,8 @@ struct CalDayCell: View {
     }
 
     func compact(_ p: Int) -> String {
-        if p >= 10_000 { return "\(p / 10_000)만" }
         let f = NumberFormatter(); f.numberStyle = .decimal
+        if p >= 100_000 { return "\(p / 10_000)만" }
         return f.string(from: NSNumber(value: p)) ?? "\(p)"
     }
 }
