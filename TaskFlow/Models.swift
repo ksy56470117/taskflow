@@ -156,8 +156,9 @@ class Transaction {
     var paymentMethod: String // "카드" | "현금" | "계좌이체"
     var memo: String
     var date: Date
+    var isPlanned: Bool
 
-    init(amount: Int, type: String, category: String, paymentMethod: String = "카드", memo: String = "", date: Date = Date()) {
+    init(amount: Int, type: String, category: String, paymentMethod: String = "카드", memo: String = "", date: Date = Date(), isPlanned: Bool = false) {
         self.id = UUID()
         self.amount = amount
         self.type = type
@@ -165,6 +166,7 @@ class Transaction {
         self.paymentMethod = paymentMethod
         self.memo = memo
         self.date = date
+        self.isPlanned = isPlanned
     }
 
     var formattedAmount: String {
@@ -329,6 +331,36 @@ class WishItem {
         "식품":    "fork.knife",
         "기타":    "tag"
     ]
+}
+
+// MARK: - ScheduledTransaction (정기 거래)
+@Model
+class ScheduledTransaction {
+    var id: UUID
+    var title: String
+    var amount: Int
+    var type: String           // "income" | "expense"
+    var category: String
+    var paymentMethod: String
+    var dayOfMonth: Int        // 매달 몇 일 (1-31)
+    var isActive: Bool
+    var memo: String
+    var createdAt: Date
+
+    init(title: String, amount: Int = 0, type: String = "expense",
+         category: String = "기타", paymentMethod: String = "카드",
+         dayOfMonth: Int = 1, memo: String = "") {
+        self.id = UUID()
+        self.title = title
+        self.amount = amount
+        self.type = type
+        self.category = category
+        self.paymentMethod = paymentMethod
+        self.dayOfMonth = dayOfMonth
+        self.isActive = true
+        self.memo = memo
+        self.createdAt = Date()
+    }
 }
 
 // MARK: - StudyPlan (학습 계획)

@@ -10,7 +10,8 @@ struct TaskFlowApp: App {
             Area.self, Project.self, Task.self, TimeEntry.self,
             StudyPlan.self, StudySession.self, SchoolEvent.self,
             WishItem.self, Transaction.self, MonthlyBudget.self,
-            SavingsAccount.self, SavingsPayment.self
+            SavingsAccount.self, SavingsPayment.self,
+            ScheduledTransaction.self
         ])
         let storeURL = Self.resolveStoreURL()
         let config = ModelConfiguration(schema: schema, url: storeURL)

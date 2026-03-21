@@ -7,13 +7,14 @@ struct SpendingView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Transaction.date, order: .reverse) private var transactions: [Transaction]
     @Query private var budgets: [MonthlyBudget]
+    @Query private var scheduled: [ScheduledTransaction]
 
     @State private var currentMonth = Date()
     @State private var selectedDate  = Calendar.current.startOfDay(for: Date())
     @State private var showAdd       = false
     @State private var viewMode: SpendMode = .calendar
 
-    enum SpendMode { case calendar, chart, budget, savings }
+    enum SpendMode { case calendar, chart, budget, savings, scheduled }
 
     var yearMonth: Int {
         let c = Calendar.current
@@ -22,18 +23,44 @@ struct SpendingView: View {
     var monthTransactions: [Transaction] {
         transactions.filter { Calendar.current.isDate($0.date, equalTo: currentMonth, toGranularity: .month) }
     }
-    var selectedTransactions: [Transaction] {
+    var selectedConfirmedTransactions: [Transaction] {
         transactions
-            .filter { Calendar.current.isDate($0.date, equalTo: selectedDate, toGranularity: .day) }
+            .filter { Calendar.current.isDate($0.date, equalTo: selectedDate, toGranularity: .day) && !$0.isPlanned }
             .sorted { $0.date < $1.date }
     }
-    var monthExpenses: Int { monthTransactions.filter { $0.type == "expense" }.reduce(0) { $0 + $1.amount } }
-    var monthIncome:   Int { monthTransactions.filter { $0.type == "income"  }.reduce(0) { $0 + $1.amount } }
+    var selectedPlannedTransactions: [Transaction] {
+        transactions
+            .filter { Calendar.current.isDate($0.date, equalTo: selectedDate, toGranularity: .day) && $0.isPlanned }
+            .sorted { $0.date < $1.date }
+    }
+    var scheduledForSelectedDate: [ScheduledTransaction] {
+        let day = Calendar.current.component(.day, from: selectedDate)
+        return scheduled.filter { $0.isActive && $0.dayOfMonth == day }
+    }
+    var plannedDates: Set<Date> {
+        var set = Set<Date>()
+        for t in monthTransactions where t.isPlanned {
+            set.insert(Calendar.current.startOfDay(for: t.date))
+        }
+        let cal = Calendar.current
+        let year  = cal.component(.year,  from: currentMonth)
+        let month = cal.component(.month, from: currentMonth)
+        let daysInMonth = cal.range(of: .day, in: .month, for: currentMonth)!.count
+        for s in scheduled where s.isActive {
+            let day = min(s.dayOfMonth, daysInMonth)
+            if let d = cal.date(from: DateComponents(year: year, month: month, day: day)) {
+                set.insert(cal.startOfDay(for: d))
+            }
+        }
+        return set
+    }
+    var monthExpenses: Int { monthTransactions.filter { $0.type == "expense" && !$0.isPlanned }.reduce(0) { $0 + $1.amount } }
+    var monthIncome:   Int { monthTransactions.filter { $0.type == "income"  && !$0.isPlanned }.reduce(0) { $0 + $1.amount } }
     var monthBudgets:  [MonthlyBudget] { budgets.filter { $0.yearMonth == yearMonth } }
 
     var dayTotals: [Date: (income: Int, expense: Int)] {
         var dict: [Date: (income: Int, expense: Int)] = [:]
-        for t in monthTransactions {
+        for t in monthTransactions where !t.isPlanned {
             let d = Calendar.current.startOfDay(for: t.date)
             var v = dict[d] ?? (0, 0)
             if t.type == "income" { v.income += t.amount } else { v.expense += t.amount }
@@ -67,6 +94,7 @@ struct SpendingView: View {
                     toolbarBtn(icon: "chart.bar.fill",         mode: .chart)
                     toolbarBtn(icon: "list.bullet.rectangle",  mode: .budget)
                     toolbarBtn(icon: "building.columns.fill",  mode: .savings)
+                    toolbarBtn(icon: "arrow.clockwise.circle", mode: .scheduled)
                     if viewMode == .calendar {
                         Button { showAdd = true } label: {
                             Image(systemName: "plus").font(.system(size: 15, weight: .semibold))
@@ -101,12 +129,15 @@ struct SpendingView: View {
                 SpendingCalendarGrid(
                     currentMonth: currentMonth,
                     selectedDate: $selectedDate,
-                    dayTotals: dayTotals
+                    dayTotals: dayTotals,
+                    plannedDates: plannedDates
                 )
                 Divider()
                 SelectedDayDetail(
                     date: selectedDate,
-                    transactions: selectedTransactions,
+                    confirmedTransactions: selectedConfirmedTransactions,
+                    plannedTransactions: selectedPlannedTransactions,
+                    scheduledForDay: scheduledForSelectedDate,
                     onAdd: { showAdd = true }
                 )
 
@@ -121,6 +152,9 @@ struct SpendingView: View {
 
             case .savings:
                 ScrollView { SavingsSection().padding(.top, 8) }
+
+            case .scheduled:
+                ScrollView { ScheduledTransactionSection().padding(.top, 8) }
             }
         }
         .navigationTitle("가계부")
@@ -128,8 +162,11 @@ struct SpendingView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .sheet(isPresented: $showAdd) {
-            AddTransactionSheet(defaultDate: selectedDate)
-                .presentationDetents([.medium, .large])
+            AddTransactionSheet(
+                defaultDate: selectedDate,
+                defaultIsPlanned: selectedDate > Calendar.current.startOfDay(for: Date())
+            )
+            .presentationDetents([.medium, .large])
         }
         #if os(macOS)
         .safeAreaInset(edge: .bottom) {
@@ -182,6 +219,7 @@ struct SpendingCalendarGrid: View {
     var currentMonth: Date
     @Binding var selectedDate: Date
     var dayTotals: [Date: (income: Int, expense: Int)]
+    var plannedDates: Set<Date> = []
 
     let cal = Calendar.current
     let weekdays = ["일", "월", "화", "수", "목", "금", "토"]
@@ -228,6 +266,7 @@ struct SpendingCalendarGrid: View {
                                 isSelected: d.map { cal.isDate($0, inSameDayAs: selectedDate) } ?? false,
                                 isToday:    d.map { cal.isDateInToday($0) } ?? false,
                                 totals:     d.flatMap { dayTotals[$0] },
+                                hasPlanned: d.map { plannedDates.contains(cal.startOfDay(for: $0)) } ?? false,
                                 colIndex:   c
                             )
                             .contentShape(Rectangle())
@@ -249,6 +288,7 @@ struct CalDayCell: View {
     var isSelected: Bool
     var isToday: Bool
     var totals: (income: Int, expense: Int)?
+    var hasPlanned: Bool = false
     var colIndex: Int
 
     var numColor: Color {
@@ -270,6 +310,12 @@ struct CalDayCell: View {
                     Text("\(day)")
                         .font(.system(size: 12, weight: isToday || isSelected ? .bold : .regular))
                         .foregroundStyle(isSelected ? Color(white: 1) : numColor)
+                }
+                .overlay(alignment: .topTrailing) {
+                    if hasPlanned && !isSelected {
+                        Circle().fill(Color.orange).frame(width: 5, height: 5)
+                            .offset(x: 3, y: -2)
+                    }
                 }
 
                 if let t = totals {
@@ -305,14 +351,19 @@ struct CalDayCell: View {
 struct SelectedDayDetail: View {
     @Environment(\.modelContext) private var modelContext
     var date: Date
-    var transactions: [Transaction]
+    var confirmedTransactions: [Transaction]
+    var plannedTransactions: [Transaction]
+    var scheduledForDay: [ScheduledTransaction]
     var onAdd: () -> Void
 
-    var dayExpense: Int { transactions.filter { $0.type == "expense" }.reduce(0) { $0 + $1.amount } }
-    var dayIncome:  Int { transactions.filter { $0.type == "income"  }.reduce(0) { $0 + $1.amount } }
+    var dayExpense: Int { confirmedTransactions.filter { $0.type == "expense" }.reduce(0) { $0 + $1.amount } }
+    var dayIncome:  Int { confirmedTransactions.filter { $0.type == "income"  }.reduce(0) { $0 + $1.amount } }
+    var hasPlanned: Bool { !plannedTransactions.isEmpty || !scheduledForDay.isEmpty }
+    var plannedCount: Int { plannedTransactions.count + scheduledForDay.count }
 
     var body: some View {
         VStack(spacing: 0) {
+            // 날짜 헤더
             HStack(spacing: 8) {
                 Text(dayString(date))
                     .font(.system(size: 13, weight: .semibold))
@@ -322,20 +373,26 @@ struct SelectedDayDetail: View {
                 if dayIncome > 0 {
                     Text("+\(formatPrice(dayIncome))").font(.system(size: 12)).foregroundStyle(.blue)
                 }
+                if hasPlanned {
+                    Text("예정 \(plannedCount)건")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.orange)
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(Color.orange.opacity(0.12))
+                        .clipShape(Capsule())
+                }
                 Spacer()
                 Button { onAdd() } label: {
                     Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.primary)
+                        .font(.system(size: 20)).foregroundStyle(.primary)
                 }.buttonStyle(.plain)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 9)
+            .padding(.horizontal, 16).padding(.vertical, 9)
             .background(Color.secondary.opacity(0.04))
 
             Divider()
 
-            if transactions.isEmpty {
+            if confirmedTransactions.isEmpty && !hasPlanned {
                 VStack(spacing: 6) {
                     Image(systemName: "tray").font(.system(size: 26)).foregroundStyle(.secondary.opacity(0.35))
                     Text("거래 내역이 없어요").font(.system(size: 13)).foregroundStyle(.secondary)
@@ -344,10 +401,47 @@ struct SelectedDayDetail: View {
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
-                        ForEach(transactions) { txn in
+                        // 확정 거래
+                        ForEach(confirmedTransactions) { txn in
                             TransactionRow(transaction: txn)
-                            if txn.id != transactions.last?.id {
+                            if txn.id != confirmedTransactions.last?.id || hasPlanned {
                                 Divider().padding(.leading, 52)
+                            }
+                        }
+
+                        // 예정 섹션
+                        if hasPlanned {
+                            HStack {
+                                Text("예정")
+                                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(.orange)
+                                    .padding(.horizontal, 8).padding(.vertical, 3)
+                                    .background(Color.orange.opacity(0.1))
+                                    .clipShape(Capsule())
+                                Spacer()
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.top, confirmedTransactions.isEmpty ? 12 : 8)
+                            .padding(.bottom, 2)
+
+                            ForEach(plannedTransactions) { txn in
+                                PlannedTransactionRow(transaction: txn) {
+                                    txn.isPlanned = false
+                                    try? modelContext.save()
+                                }
+                                Divider().padding(.leading, 52)
+                            }
+                            ForEach(scheduledForDay) { s in
+                                ScheduledPreviewRow(scheduled: s) {
+                                    let t = Transaction(
+                                        amount: s.amount, type: s.type, category: s.category,
+                                        paymentMethod: s.paymentMethod, memo: s.title, date: date
+                                    )
+                                    modelContext.insert(t)
+                                    try? modelContext.save()
+                                }
+                                if s.id != scheduledForDay.last?.id {
+                                    Divider().padding(.leading, 52)
+                                }
                             }
                         }
                     }
@@ -359,6 +453,76 @@ struct SelectedDayDetail: View {
     func dayString(_ d: Date) -> String {
         let f = DateFormatter(); f.locale = Locale(identifier: "ko_KR"); f.dateFormat = "M월 d일 (E)"
         return f.string(from: d)
+    }
+}
+
+// MARK: - 예정 거래 행 (isPlanned == true인 Transaction)
+struct PlannedTransactionRow: View {
+    var transaction: Transaction
+    var onConfirm: () -> Void
+
+    var catColor: Color {
+        Color(hex: Transaction.categoryColor[transaction.category] ?? "9CA3AF") ?? .secondary
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().fill(catColor.opacity(0.08)).frame(width: 36, height: 36)
+                Image(systemName: Transaction.categoryIcon[transaction.category] ?? "ellipsis.circle")
+                    .font(.system(size: 15)).foregroundStyle(catColor.opacity(0.5))
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(transaction.memo.isEmpty ? transaction.category : transaction.memo)
+                    .font(.system(size: 15)).foregroundStyle(.secondary)
+                Text(transaction.category).font(.system(size: 12)).foregroundStyle(.tertiary)
+            }
+            Spacer()
+            Text(transaction.formattedAmount)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(transaction.type == "income" ? Color.blue.opacity(0.55) : Color.secondary)
+            Button { onConfirm() } label: {
+                Text("확정")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(Color.orange).clipShape(Capsule())
+            }.buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 10)
+    }
+}
+
+// MARK: - 정기 거래 예정 행 (ScheduledTransaction)
+struct ScheduledPreviewRow: View {
+    var scheduled: ScheduledTransaction
+    var onConfirm: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().fill(Color.orange.opacity(0.1)).frame(width: 36, height: 36)
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 13)).foregroundStyle(Color.orange.opacity(0.7))
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(scheduled.title)
+                    .font(.system(size: 15)).foregroundStyle(.secondary)
+                Text("정기 \(scheduled.type == "income" ? "수입" : "지출") · \(scheduled.category)")
+                    .font(.system(size: 12)).foregroundStyle(.tertiary)
+            }
+            Spacer()
+            let sign = scheduled.type == "income" ? "+" : "-"
+            Text("\(sign)\(formatPrice(scheduled.amount))")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(scheduled.type == "income" ? Color.blue.opacity(0.55) : Color.secondary)
+            Button { onConfirm() } label: {
+                Text("확정")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(Color.orange).clipShape(Capsule())
+            }.buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 10)
     }
 }
 
@@ -852,6 +1016,7 @@ struct AddTransactionSheet: View {
 
     var editTransaction: Transaction? = nil
     var defaultDate: Date = Date()
+    var defaultIsPlanned: Bool = false
 
     @State private var type = "expense"
     @State private var amountText = ""
@@ -859,6 +1024,7 @@ struct AddTransactionSheet: View {
     @State private var paymentMethod = "카드"
     @State private var memo = ""
     @State private var date = Date()
+    @State private var isPlanned = false
 
     var isEditing: Bool { editTransaction != nil }
     var accentColor: Color { type == "expense" ? .red : .blue }
@@ -1027,6 +1193,15 @@ struct AddTransactionSheet: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
 
+                Divider().padding(.horizontal, 16)
+
+                // MARK: 예정 여부
+                infoRow(label: "예정으로 저장") {
+                    Toggle("", isOn: $isPlanned)
+                        .labelsHidden()
+                        .tint(.orange)
+                }
+
                 Spacer()
 
                 // MARK: 취소 / 기록
@@ -1054,7 +1229,10 @@ struct AddTransactionSheet: View {
             }
         }
         .onAppear {
-            if editTransaction == nil { date = defaultDate }
+            if editTransaction == nil {
+                date = defaultDate
+                isPlanned = defaultIsPlanned
+            }
             loadEdit()
         }
     }
@@ -1080,6 +1258,7 @@ struct AddTransactionSheet: View {
         paymentMethod = t.paymentMethod
         memo = t.memo
         date = t.date
+        isPlanned = t.isPlanned
     }
 
     func submit() {
@@ -1088,10 +1267,12 @@ struct AddTransactionSheet: View {
         if let t = editTransaction {
             t.type = type; t.amount = amount; t.category = category
             t.paymentMethod = paymentMethod; t.memo = memo; t.date = date
+            t.isPlanned = isPlanned
         } else {
             let t = Transaction(
                 amount: amount, type: type, category: category,
-                paymentMethod: paymentMethod, memo: memo, date: date
+                paymentMethod: paymentMethod, memo: memo, date: date,
+                isPlanned: isPlanned
             )
             modelContext.insert(t)
         }
@@ -1642,6 +1823,279 @@ struct AddSavingsAccountSheet: View {
                 startDate: startDate, endDate: endDate, interestRate: rate, memo: memo
             )
             modelContext.insert(a)
+        }
+        try? modelContext.save()
+        dismiss()
+    }
+}
+
+// MARK: - 정기 거래 섹션
+struct ScheduledTransactionSection: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \ScheduledTransaction.createdAt) private var items: [ScheduledTransaction]
+    @State private var showAdd = false
+
+    var activeIncome:  Int { items.filter { $0.isActive && $0.type == "income"  }.reduce(0) { $0 + $1.amount } }
+    var activeExpense: Int { items.filter { $0.isActive && $0.type == "expense" }.reduce(0) { $0 + $1.amount } }
+    var incomeItems:  [ScheduledTransaction] { items.filter { $0.type == "income"  } }
+    var expenseItems: [ScheduledTransaction] { items.filter { $0.type == "expense" } }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            // 요약 카드
+            if !items.isEmpty {
+                let net = activeIncome - activeExpense
+                HStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("월 정기 수입").font(.system(size: 12)).foregroundStyle(.secondary)
+                        Text("+\(formatPrice(activeIncome))")
+                            .font(.system(size: 18, weight: .bold)).foregroundStyle(.blue)
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                    Divider().frame(height: 40)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("월 정기 지출").font(.system(size: 12)).foregroundStyle(.secondary)
+                        Text("-\(formatPrice(activeExpense))")
+                            .font(.system(size: 18, weight: .bold)).foregroundStyle(.red)
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 16)
+                    Divider().frame(height: 40)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("순 정기").font(.system(size: 12)).foregroundStyle(.secondary)
+                        Text((net >= 0 ? "+" : "") + formatPrice(net))
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(net >= 0 ? Color.primary : Color.red)
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 16)
+                }
+                .padding(16)
+                .background(.background)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .padding(.horizontal, 16)
+            }
+
+            // 헤더
+            HStack {
+                Text("정기 거래 목록")
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+                Spacer()
+                Button { showAdd = true } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus").font(.system(size: 12, weight: .semibold))
+                        Text("추가").font(.system(size: 13))
+                    }.foregroundStyle(.orange)
+                }.buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
+
+            if items.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "arrow.clockwise.circle")
+                        .font(.system(size: 40)).foregroundStyle(.secondary.opacity(0.35))
+                    Text("등록된 정기 거래가 없어요")
+                        .font(.system(size: 15)).foregroundStyle(.secondary)
+                    Text("매달 반복되는 수입·지출을 등록하면\n캘린더에 예정으로 자동 표시돼요")
+                        .font(.system(size: 13)).foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                    Button { showAdd = true } label: {
+                        Text("정기 거래 추가")
+                            .font(.system(size: 14, weight: .medium)).foregroundStyle(.white)
+                            .padding(.horizontal, 20).padding(.vertical, 10)
+                            .background(Color.orange).clipShape(Capsule())
+                    }.buttonStyle(.plain).padding(.top, 4)
+                }
+                .frame(maxWidth: .infinity).padding(.vertical, 30)
+            } else {
+                VStack(spacing: 12) {
+                    if !incomeItems.isEmpty  { ScheduledGroup(title: "정기 수입",  items: incomeItems) }
+                    if !expenseItems.isEmpty { ScheduledGroup(title: "정기 지출", items: expenseItems) }
+                }
+                .padding(.horizontal, 16)
+            }
+            Spacer().frame(height: 100)
+        }
+        .sheet(isPresented: $showAdd) { AddScheduledTransactionSheet() }
+    }
+}
+
+// MARK: - 정기 거래 그룹
+struct ScheduledGroup: View {
+    var title: String
+    var items: [ScheduledTransaction]
+    @State private var editItem: ScheduledTransaction? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                .padding(.horizontal, 14).padding(.bottom, 6)
+            VStack(spacing: 0) {
+                ForEach(items) { item in
+                    ScheduledTransactionRow(item: item) { editItem = item }
+                    if item.id != items.last?.id { Divider().padding(.leading, 52) }
+                }
+            }
+            .background(.background)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .sheet(item: $editItem) { item in AddScheduledTransactionSheet(editItem: item) }
+    }
+}
+
+// MARK: - 정기 거래 행
+struct ScheduledTransactionRow: View {
+    @Environment(\.modelContext) private var modelContext
+    @Bindable var item: ScheduledTransaction
+    var onEdit: () -> Void
+
+    var catColor: Color {
+        Color(hex: Transaction.categoryColor[item.category] ?? "9CA3AF") ?? .secondary
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().fill(catColor.opacity(0.15)).frame(width: 36, height: 36)
+                Image(systemName: Transaction.categoryIcon[item.category] ?? "ellipsis.circle")
+                    .font(.system(size: 15)).foregroundStyle(catColor)
+            }
+            .opacity(item.isActive ? 1 : 0.4)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                    .font(.system(size: 15))
+                    .foregroundStyle(item.isActive ? .primary : .secondary)
+                Text("매달 \(item.dayOfMonth)일 · \(item.category)")
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            let sign = item.type == "income" ? "+" : "-"
+            Text("\(sign)\(formatPrice(item.amount))")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(item.type == "income" ? Color.blue : Color.primary)
+                .opacity(item.isActive ? 1 : 0.4)
+
+            Toggle("", isOn: $item.isActive)
+                .labelsHidden()
+                .tint(item.type == "income" ? Color.blue : Color.red)
+                .scaleEffect(0.8)
+                .onChange(of: item.isActive) { _, _ in try? modelContext.save() }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 11)
+        .contentShape(Rectangle())
+        .onTapGesture { onEdit() }
+        .contextMenu {
+            Button { onEdit() } label: { Label("편집", systemImage: "pencil") }
+            Divider()
+            Button(role: .destructive) {
+                modelContext.delete(item); try? modelContext.save()
+            } label: { Label("삭제", systemImage: "trash") }
+        }
+    }
+}
+
+// MARK: - 정기 거래 추가/편집 시트
+struct AddScheduledTransactionSheet: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+
+    var editItem: ScheduledTransaction? = nil
+
+    @State private var title = ""
+    @State private var type = "expense"
+    @State private var amountText = ""
+    @State private var category = "식비"
+    @State private var paymentMethod = "카드"
+    @State private var dayOfMonth = 1
+    @State private var memo = ""
+
+    var isEditing: Bool { editItem != nil }
+    var categories: [String] { type == "expense" ? Transaction.expenseCategories : Transaction.incomeCategories }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("기본 정보") {
+                    TextField("거래 이름 (예: 월급, 넷플릭스)", text: $title)
+                    Picker("종류", selection: $type) {
+                        Text("지출").tag("expense")
+                        Text("수입").tag("income")
+                    }
+                    .onChange(of: type) { _, _ in
+                        category = type == "expense"
+                            ? Transaction.expenseCategories[0]
+                            : Transaction.incomeCategories[0]
+                    }
+                }
+                Section("금액 및 분류") {
+                    HStack {
+                        Image(systemName: "wonsign").foregroundStyle(.secondary)
+                        TextField("금액", text: $amountText)
+                            #if os(iOS)
+                            .keyboardType(.numberPad)
+                            #endif
+                    }
+                    Picker("카테고리", selection: $category) {
+                        ForEach(categories, id: \.self) { cat in
+                            Label(cat, systemImage: Transaction.categoryIcon[cat] ?? "tag").tag(cat)
+                        }
+                    }
+                    if type == "expense" {
+                        Picker("결제 수단", selection: $paymentMethod) {
+                            ForEach(Transaction.paymentMethods, id: \.self) { Text($0).tag($0) }
+                        }
+                    }
+                }
+                Section("반복 일정") {
+                    Stepper(value: $dayOfMonth, in: 1...31) {
+                        HStack {
+                            Text("반복일")
+                            Spacer()
+                            Text("매달 \(dayOfMonth)일")
+                                .foregroundStyle(.orange).fontWeight(.medium)
+                        }
+                    }
+                }
+                Section("메모") {
+                    TextField("메모 (선택)", text: $memo, axis: .vertical).lineLimit(2...3)
+                }
+            }
+            .navigationTitle(isEditing ? "정기 거래 편집" : "정기 거래 추가")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isEditing ? "저장" : "추가") { submit() }
+                        .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || amountText.isEmpty)
+                }
+            }
+        }
+        .onAppear { loadEdit() }
+    }
+
+    func loadEdit() {
+        guard let item = editItem else { return }
+        title = item.title; type = item.type
+        amountText = item.amount > 0 ? "\(item.amount)" : ""
+        category = item.category; paymentMethod = item.paymentMethod
+        dayOfMonth = item.dayOfMonth; memo = item.memo
+    }
+
+    func submit() {
+        let amount = Int(amountText.replacingOccurrences(of: ",", with: "")) ?? 0
+        guard amount > 0, !title.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        if let item = editItem {
+            item.title = title.trimmingCharacters(in: .whitespaces)
+            item.type = type; item.amount = amount; item.category = category
+            item.paymentMethod = paymentMethod; item.dayOfMonth = dayOfMonth; item.memo = memo
+        } else {
+            let item = ScheduledTransaction(
+                title: title.trimmingCharacters(in: .whitespaces),
+                amount: amount, type: type, category: category,
+                paymentMethod: paymentMethod, dayOfMonth: dayOfMonth, memo: memo
+            )
+            modelContext.insert(item)
         }
         try? modelContext.save()
         dismiss()
