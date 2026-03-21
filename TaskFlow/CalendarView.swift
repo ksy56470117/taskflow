@@ -122,6 +122,10 @@ struct CalendarView: View {
             }
         }
         .background(Color.secondary.opacity(0.1))
+        .sheet(isPresented: $showAddTask) {
+            CalendarAddTaskSheet(date: selectedDate, projects: projects)
+                .presentationDetents([.medium])
+        }
     }
 
     var selectedDateLabel: String {
