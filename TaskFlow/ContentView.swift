@@ -199,6 +199,7 @@ struct ThingsSidebar: View {
                         .buttonStyle(.plain)
                     }
                     .tag(SidebarItem.area(area.id))
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.area(area.id)) })
 
                     // 하위 프로젝트
                     ForEach(area.projects.sorted { $0.order < $1.order }) { project in
@@ -219,6 +220,7 @@ struct ThingsSidebar: View {
                             }
                         }
                         .tag(SidebarItem.project(project.id))
+                        .simultaneousGesture(TapGesture().onEnded { onTap?(.project(project.id)) })
                     }
                 }
             }
@@ -239,6 +241,7 @@ struct ThingsSidebar: View {
                             }
                         }
                         .tag(SidebarItem.project(project.id))
+                        .simultaneousGesture(TapGesture().onEnded { onTap?(.project(project.id)) })
                     }
                 }
             }
