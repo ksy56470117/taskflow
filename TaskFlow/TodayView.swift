@@ -135,6 +135,10 @@ struct TodayView: View {
             }
         }
         .background(.clear)
+        .sheet(isPresented: $showAddTaskNoProject) {
+            CalendarAddTaskSheet(date: Date(), projects: projects)
+                .presentationDetents([.medium])
+        }
     }
 }
 
