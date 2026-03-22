@@ -17,13 +17,6 @@ struct CalendarView: View {
         }
     }
 
-    func dotColors(on date: Date) -> [Color] {
-        tasksForDate(date).map { task in
-            if let proj = task.project, let c = Color(hex: proj.colorHex) { return c }
-            return Color.gray
-        }
-    }
-
     var tasksForSelected: [Task] { tasksForDate(selectedDate) }
 
     var body: some View {
