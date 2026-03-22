@@ -260,13 +260,18 @@ struct CalendarTaskRow: View {
             }
             .buttonStyle(.plain)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(task.title)
                     .font(.system(size: 14))
                     .foregroundStyle(task.isCompleted ? Color.secondary : Color.primary)
                     .strikethrough(task.isCompleted)
-                if let proj = task.project {
-                    Text(proj.name).font(.system(size: 12)).foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    if let proj = task.project {
+                        Text(proj.name).font(.system(size: 12)).foregroundStyle(.secondary)
+                    }
+                    ForEach(task.tags) { tag in
+                        TagChip(tag: tag)
+                    }
                 }
             }
             Spacer()
