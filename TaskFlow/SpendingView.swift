@@ -697,6 +697,12 @@ struct TransactionRow: View {
                     Text(transaction.category)
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
+                    if !transaction.subcategory.isEmpty {
+                        Text("·").font(.system(size: 12)).foregroundStyle(.tertiary)
+                        Text(transaction.subcategory)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
                     if !transaction.store.isEmpty {
                         Text("·").font(.system(size: 12)).foregroundStyle(.tertiary)
                         Text(transaction.store)
