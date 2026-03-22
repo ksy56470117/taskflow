@@ -202,25 +202,22 @@ class Transaction {
     ]
 
     static let categoryIcon: [String: String] = [
-        "식비": "fork.knife", "카페/디저트": "cup.and.saucer", "배달": "bicycle",
-        "교통": "car", "쇼핑": "bag", "온라인쇼핑": "cart",
-        "문화/여가": "ticket", "의료": "cross.case", "미용/뷰티": "sparkles",
-        "운동/헬스": "figure.run", "통신": "wifi", "구독서비스": "arrow.clockwise.circle",
-        "주거": "house", "교육": "graduationcap", "여행": "airplane",
-        "반려동물": "pawprint", "보험": "shield", "기타": "ellipsis.circle",
-        "급여": "banknote", "용돈": "gift", "부업": "briefcase",
-        "투자수익": "chart.line.uptrend.xyaxis", "환급": "arrow.uturn.left"
+        // 지출
+        "중고거래": "arrow.2.squarepath", "구독": "arrow.clockwise.circle",
+        "배송비": "shippingbox", "의류": "tshirt", "뷰티": "sparkles",
+        "생필품": "cart", "디지털": "laptopcomputer", "소셜": "person.2",
+        "문화": "ticket", "기타": "ellipsis.circle",
+        // 수입
+        "용돈": "gift", "환불": "arrow.uturn.left"
     ]
 
     static let categoryColor: [String: String] = [
-        "식비": "FF6B6B", "카페/디저트": "C084FC", "배달": "F97316",
-        "교통": "4ECDC4", "쇼핑": "A78BFA", "온라인쇼핑": "818CF8",
-        "문화/여가": "F59E0B", "의료": "EF4444", "미용/뷰티": "F472B6",
-        "운동/헬스": "34D399", "통신": "3B82F6", "구독서비스": "6366F1",
-        "주거": "10B981", "교육": "8B5CF6", "여행": "0EA5E9",
-        "반려동물": "FCD34D", "보험": "94A3B8", "기타": "9CA3AF",
-        "급여": "22C55E", "용돈": "84CC16", "부업": "F97316",
-        "투자수익": "06B6D4", "환급": "10B981"
+        // 지출
+        "중고거래": "F97316", "구독": "6366F1", "배송비": "94A3B8",
+        "의류": "A78BFA", "뷰티": "F472B6", "생필품": "34D399",
+        "디지털": "3B82F6", "소셜": "EC4899", "문화": "F59E0B", "기타": "9CA3AF",
+        // 수입
+        "용돈": "84CC16", "환불": "10B981"
     ]
 }
 
