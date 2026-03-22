@@ -503,6 +503,20 @@ struct TaskEditSheet: View {
 
             Divider()
 
+            // 태그
+            HStack(spacing: 10) {
+                Image(systemName: "tag")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22)
+                TagPickerButton(task: task)
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+
+            Divider()
+
             // 마감일
             HStack(spacing: 10) {
                 Image(systemName: "calendar")
