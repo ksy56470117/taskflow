@@ -129,7 +129,7 @@ struct MacContentView: View {
 
 // MARK: - Sidebar Item
 enum SidebarItem: Hashable {
-    case today, stats, calendar, studyPlan, spending, wishlist, notes
+    case today, upcoming, stats, calendar, studyPlan, spending, wishlist, notes
     case area(UUID)
     case project(UUID)
 }
