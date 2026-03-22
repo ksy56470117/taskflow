@@ -21,37 +21,36 @@ struct UpcomingView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 // 헤더
-                HStack(alignment: .firstTextBaseline) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Image(systemName: "calendar.badge.clock")
-                        .font(.system(size: 22, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.red)
                     Text("Upcoming")
-                        .font(.system(size: 28, weight: .bold))
+                        .font(.system(size: 20, weight: .bold))
                     Spacer()
                 }
-                .padding(.horizontal, 28)
-                .padding(.top, 20)
-                .padding(.bottom, 8)
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
+                .padding(.bottom, 6)
 
                 if upcomingGroups.isEmpty {
-                    VStack(spacing: 12) {
+                    VStack(spacing: 8) {
                         Image(systemName: "calendar")
-                            .font(.system(size: 44))
-                            .foregroundStyle(.secondary.opacity(0.35))
+                            .font(.system(size: 32))
+                            .foregroundStyle(.secondary.opacity(0.3))
                         Text("예정된 태스크 없음")
-                            .font(.system(size: 16))
+                            .font(.system(size: 14))
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 100)
+                    .padding(.top, 80)
                 } else {
                     ForEach(upcomingGroups, id: \.0) { date, tasks in
                         UpcomingDaySection(date: date, tasks: tasks)
-                            .padding(.bottom, 8)
                     }
                 }
 
-                Spacer().frame(height: 40)
+                Spacer().frame(height: 30)
             }
         }
         .background(Color(.windowBackgroundColor))
@@ -64,47 +63,48 @@ struct UpcomingDaySection: View {
     var tasks: [Task]
 
     var cal: Calendar { Calendar.current }
-    var isToday: Bool { cal.isDateInToday(date) }
+    var isToday: Bool    { cal.isDateInToday(date) }
     var isTomorrow: Bool { cal.isDateInTomorrow(date) }
-
     var dayNumber: String { "\(cal.component(.day, from: date))" }
 
     var dayLabel: String {
-        if isToday { return "오늘" }
+        if isToday    { return "오늘" }
         if isTomorrow { return "내일" }
-        let f = DateFormatter(); f.locale = Locale(identifier: "ko_KR"); f.dateFormat = "EEEE"
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "EEEE"
         return f.string(from: date)
     }
 
     var monthLabel: String {
-        let f = DateFormatter(); f.locale = Locale(identifier: "ko_KR"); f.dateFormat = "M월"
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "M월"
         return f.string(from: date)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // 날짜 헤더
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
                 Text(dayNumber)
-                    .font(.system(size: 32, weight: .bold))
+                    .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(isToday ? Color.blue : Color.primary)
                 Text(dayLabel)
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                 Spacer()
                 if !isToday && !isTomorrow {
                     Text(monthLabel)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.secondary.opacity(0.7))
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.secondary.opacity(0.6))
                 }
             }
-            .padding(.horizontal, 28)
-            .padding(.top, 20)
-            .padding(.bottom, 6)
+            .padding(.horizontal, 20)
+            .padding(.top, 14)
+            .padding(.bottom, 4)
 
-            Divider()
-                .padding(.horizontal, 28)
-                .padding(.bottom, 2)
+            Divider().padding(.horizontal, 20)
 
             ForEach(tasks) { task in
                 UpcomingTaskRow(task: task)
@@ -121,25 +121,25 @@ struct UpcomingTaskRow: View {
     @State private var showDeleteAlert = false
 
     var projColor: Color {
-        guard let proj = task.project else { return Color.secondary.opacity(0.5) }
+        guard let proj = task.project else { return Color.secondary.opacity(0.4) }
         return Color(hex: proj.colorHex) ?? .secondary
     }
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 10) {
             // 체크박스
             ZStack {
                 Circle()
                     .strokeBorder(projColor.opacity(0.7), lineWidth: 1.5)
-                    .frame(width: 22, height: 22)
+                    .frame(width: 18, height: 18)
                 if task.isCompleted {
-                    Circle().fill(projColor).frame(width: 22, height: 22)
+                    Circle().fill(projColor).frame(width: 18, height: 18)
                     Image(systemName: "checkmark")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 8, weight: .bold))
                         .foregroundStyle(.white)
                 }
             }
-            .frame(width: 30, height: 30)
+            .frame(width: 26, height: 26)
             .contentShape(Circle())
             .onTapGesture {
                 task.isCompleted.toggle()
@@ -147,18 +147,18 @@ struct UpcomingTaskRow: View {
             }
 
             // 내용
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)
-                    .font(.system(size: 15))
+                    .font(.system(size: 13))
                     .foregroundStyle(task.isCompleted ? Color.secondary : Color.primary)
                     .strikethrough(task.isCompleted, color: Color.secondary.opacity(0.5))
 
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     if let proj = task.project {
                         HStack(spacing: 3) {
                             Circle().fill(projColor).frame(width: 5, height: 5)
                             Text(proj.name)
-                                .font(.system(size: 12))
+                                .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -174,22 +174,22 @@ struct UpcomingTaskRow: View {
             if let due = task.dueDate {
                 let days = daysFromToday(due)
                 if days > 1 {
-                    HStack(spacing: 3) {
+                    HStack(spacing: 2) {
                         Image(systemName: "flag.fill")
                             .font(.system(size: 9))
-                        Text("\(days) days left")
+                        Text("\(days)일 후")
                             .font(.system(size: 11))
                     }
-                    .foregroundStyle(Color.secondary.opacity(0.6))
+                    .foregroundStyle(Color.secondary.opacity(0.5))
                 } else if days == 1 {
                     Text("내일")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color.orange)
+                        .foregroundStyle(Color.orange.opacity(0.8))
                 }
             }
         }
-        .padding(.horizontal, 28)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 6)
         .contextMenu {
             Button { showEdit = true } label: { Label("편집", systemImage: "pencil") }
             Button {
