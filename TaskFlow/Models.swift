@@ -157,9 +157,10 @@ class Transaction {
     var memo: String
     var date: Date
     var isPlanned: Bool
-    var store: String = ""   // 구매처 (쿠팡, 배민 등)
+    var store: String = ""        // 구매처 (쿠팡, 배민 등)
+    var subcategory: String = ""  // 구독 서브카테고리 (토스프라임, 애플뮤직, Claude 등)
 
-    init(amount: Int, type: String, category: String, paymentMethod: String = "카드", memo: String = "", date: Date = Date(), isPlanned: Bool = false, store: String = "") {
+    init(amount: Int, type: String, category: String, paymentMethod: String = "카드", memo: String = "", date: Date = Date(), isPlanned: Bool = false, store: String = "", subcategory: String = "") {
         self.id = UUID()
         self.amount = amount
         self.type = type
@@ -169,6 +170,7 @@ class Transaction {
         self.date = date
         self.isPlanned = isPlanned
         self.store = store
+        self.subcategory = subcategory
     }
 
     var formattedAmount: String {
