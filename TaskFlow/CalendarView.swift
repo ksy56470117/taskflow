@@ -243,6 +243,36 @@ struct CalendarTaskRow: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .overlay(alignment: .bottom) { Divider().padding(.leading, 52) }
+        .contextMenu {
+            Button {
+                showEdit = true
+            } label: {
+                Label("편집", systemImage: "pencil")
+            }
+            Button {
+                task.isCompleted.toggle()
+                try? modelContext.save()
+            } label: {
+                Label(task.isCompleted ? "미완료로 표시" : "완료로 표시",
+                      systemImage: task.isCompleted ? "circle" : "checkmark.circle")
+            }
+            Divider()
+            Button(role: .destructive) {
+                showDeleteAlert = true
+            } label: {
+                Label("삭제", systemImage: "trash")
+            }
+        }
+        .sheet(isPresented: $showEdit) {
+            TaskEditSheet(task: task)
+        }
+        .alert("태스크를 삭제할까요?", isPresented: $showDeleteAlert) {
+            Button("삭제", role: .destructive) {
+                modelContext.delete(task)
+                try? modelContext.save()
+            }
+            Button("취소", role: .cancel) {}
+        }
     }
 }
 
