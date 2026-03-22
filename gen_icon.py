@@ -25,8 +25,8 @@ def make_icon(size):
     img = Image.new("RGBA", (s,s), (0,0,0,0))
     img.paste(bg, (0,0), bg)
 
-    # 이모지 렌더링
-    font_size = int(s * 0.52)
+    # 이모지 렌더링 — Apple Color Emoji는 em size가 달라 3배로 설정
+    font_size = int(s * 1.6)
     try:
         font = ImageFont.truetype("/System/Library/Fonts/Apple Color Emoji.ttc", font_size)
     except:
