@@ -321,6 +321,7 @@ struct CalendarAddTaskSheet: View {
 
     @State private var title = ""
     @State private var selectedProject: Project? = nil
+    @State private var tempTask: Task? = nil
 
     var sortedProjects: [Project] { projects.sorted { $0.name < $1.name } }
     var canSubmit: Bool { !title.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -410,6 +411,22 @@ struct CalendarAddTaskSheet: View {
 
             Divider()
 
+            // 태그 선택
+            HStack(spacing: 10) {
+                Image(systemName: "tag")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22)
+                if let task = tempTask {
+                    TagPickerButton(task: task)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+
+            Divider()
+
             // 날짜
             HStack(spacing: 10) {
                 Image(systemName: "calendar")
@@ -430,7 +447,12 @@ struct CalendarAddTaskSheet: View {
 
             // 버튼
             HStack(spacing: 10) {
-                Button { dismiss() } label: {
+                Button {
+                    // 취소 시 임시 태스크 삭제
+                    if let t = tempTask { modelContext.delete(t) }
+                    try? modelContext.save()
+                    dismiss()
+                } label: {
                     Text("취소")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.secondary)
@@ -457,15 +479,23 @@ struct CalendarAddTaskSheet: View {
             .padding(.bottom, 16)
         }
         .background(.background)
-        .onAppear { focused = true }
+        .onAppear {
+            focused = true
+            // TagPickerButton needs a Task to bind to — create temp task now
+            let t = Task(title: "__temp__", project: nil)
+            t.dueDate = date
+            modelContext.insert(t)
+            try? modelContext.save()
+            tempTask = t
+        }
     }
 
     func submit() {
         let trimmed = title.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        let task = Task(title: trimmed, project: selectedProject)
+        guard !trimmed.isEmpty, let task = tempTask else { return }
+        task.title = trimmed
+        task.project = selectedProject
         task.dueDate = date
-        modelContext.insert(task)
         if let p = selectedProject {
             p.tasks.append(task)
         }
