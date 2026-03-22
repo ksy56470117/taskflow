@@ -91,6 +91,22 @@ class Task {
     }
 }
 
+// MARK: - Tag
+@Model
+class Tag {
+    var id: UUID
+    var name: String
+    var colorHex: String
+    var createdAt: Date
+
+    init(name: String, colorHex: String = "6366F1") {
+        self.id = UUID()
+        self.name = name
+        self.colorHex = colorHex
+        self.createdAt = Date()
+    }
+}
+
 // MARK: - TimeEntry
 @Model
 class TimeEntry {
