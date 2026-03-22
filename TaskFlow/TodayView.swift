@@ -224,7 +224,7 @@ struct TaskRow: View {
     @State private var showDeleteAlert = false
 
     var isRunning: Bool { timerManager.isRunning(task: task) }
-    var checkColor: Color { Color(hex: project.colorHex) ?? .blue }
+    var checkColor: Color { project.flatMap { Color(hex: $0.colorHex) } ?? Color.secondary.opacity(0.5) }
 
     var body: some View {
         VStack(spacing: 0) {
