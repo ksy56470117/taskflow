@@ -183,19 +183,19 @@ struct DayCell: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 1) {
             // 날짜 숫자
             ZStack {
                 if isSelected {
-                    Circle().fill(Color.blue).frame(width: 24, height: 24)
+                    Circle().fill(Color.blue).frame(width: 18, height: 18)
                 } else if isToday {
-                    Circle().stroke(Color.blue, lineWidth: 1.5).frame(width: 24, height: 24)
+                    Circle().stroke(Color.blue, lineWidth: 1.2).frame(width: 18, height: 18)
                 }
                 Text("\(dayNum)")
-                    .font(.system(size: 12, weight: isToday || isSelected ? .bold : .regular))
+                    .font(.system(size: 10, weight: isToday || isSelected ? .bold : .regular))
                     .foregroundStyle(numColor)
             }
-            .frame(width: 24, height: 24)
+            .frame(width: 18, height: 18)
 
             // 태스크 칩
             ForEach(tasks) { task in
@@ -203,27 +203,27 @@ struct DayCell: View {
                 HStack(spacing: 2) {
                     RoundedRectangle(cornerRadius: 1)
                         .fill(col)
-                        .frame(width: 2.5)
+                        .frame(width: 2)
                         .frame(maxHeight: .infinity)
                     Text(task.title)
-                        .font(.system(size: 9.5))
+                        .font(.system(size: 8))
                         .foregroundStyle(
                             task.isCompleted
-                                ? Color.secondary.opacity(0.6)
-                                : (isCurrentMonth ? Color.primary : Color.secondary)
+                                ? Color.secondary.opacity(0.5)
+                                : (isCurrentMonth ? Color.primary.opacity(0.85) : Color.secondary)
                         )
                         .strikethrough(task.isCompleted, color: .secondary)
-                        .lineLimit(nil)          // 줄넘김 제한 없음
+                        .lineLimit(nil)
                         .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.leading)
                 }
-                .padding(.horizontal, 3)
-                .padding(.vertical, 2)
-                .background(col.opacity(0.10))
-                .clipShape(RoundedRectangle(cornerRadius: 3))
+                .padding(.horizontal, 2)
+                .padding(.vertical, 1)
+                .background(col.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 2))
             }
         }
-        .padding(.horizontal, 3)
+        .padding(.horizontal, 2)
         .padding(.vertical, 5)
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
