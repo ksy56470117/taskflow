@@ -50,31 +50,43 @@ struct CalendarView: View {
 
                 // 달력 그리드
                 VStack(spacing: 0) {
+                    // 요일 헤더
                     HStack(spacing: 0) {
-                        ForEach(["일","월","화","수","목","금","토"], id: \.self) { d in
+                        ForEach(Array(["일","월","화","수","목","금","토"].enumerated()), id: \.offset) { i, d in
                             Text(d)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(.secondary)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(i == 0 ? Color.red.opacity(0.7) : i == 6 ? Color.blue.opacity(0.7) : Color.secondary)
                                 .frame(maxWidth: .infinity)
                         }
                     }
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 6)
 
-                    let days = generateDays(for: displayMonth)
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 4) {
-                        ForEach(days, id: \.self) { date in
-                            DayCell(
-                                date: date,
-                                isCurrentMonth: calendar.isDate(date, equalTo: displayMonth, toGranularity: .month),
-                                isToday: calendar.isDateInToday(date),
-                                isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
-                                dotColors: dotColors(on: date)
-                            )
-                            .onTapGesture { selectedDate = date }
+                    Divider()
+
+                    // 주 단위 행 — 각 행 높이가 독립적으로 늘어남
+                    let weeks = generateDays(for: displayMonth).chunked(into: 7)
+                    VStack(spacing: 0) {
+                        ForEach(weeks.indices, id: \.self) { wi in
+                            HStack(spacing: 0) {
+                                ForEach(0..<7, id: \.self) { di in
+                                    let date = weeks[wi][di]
+                                    DayCell(
+                                        date: date,
+                                        isCurrentMonth: calendar.isDate(date, equalTo: displayMonth, toGranularity: .month),
+                                        isToday: calendar.isDateInToday(date),
+                                        isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
+                                        tasks: tasksForDate(date),
+                                        colIndex: di
+                                    )
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { selectedDate = date }
+                                    if di < 6 { Divider() }
+                                }
+                            }
+                            if wi < weeks.count - 1 { Divider() }
                         }
                     }
-                    .padding(.horizontal, 4)
-                    .padding(.bottom, 12)
                 }
                 .background(.background)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
