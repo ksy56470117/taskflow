@@ -116,7 +116,8 @@ struct WishlistView: View {
         }
         #endif
         .sheet(isPresented: $showAdd) {
-            AddWishItemSheet()
+            AddWishItemSheet(defaultCategory: selectedCategory ?? "기타")
+                .presentationDetents([.height(540)])
         }
         #if os(macOS)
         .safeAreaInset(edge: .bottom) {
