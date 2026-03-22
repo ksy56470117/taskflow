@@ -271,26 +271,24 @@ struct WishItemRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // 구매 체크
-            Button {
-                withAnimation(.spring(duration: 0.2)) {
-                    item.isPurchased.toggle()
-                    try? modelContext.save()
-                }
-            } label: {
-                ZStack {
-                    Circle()
-                        .strokeBorder(item.isPurchased ? Color.green : Color.secondary.opacity(0.3), lineWidth: 1.5)
-                        .frame(width: 22, height: 22)
-                    if item.isPurchased {
-                        Circle().fill(Color.green).frame(width: 22, height: 22)
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
+            // 구매 체크 — macOS 히트 영역 명시
+            ZStack {
+                Circle()
+                    .strokeBorder(item.isPurchased ? Color.green : Color.secondary.opacity(0.35), lineWidth: 1.5)
+                    .frame(width: 22, height: 22)
+                if item.isPurchased {
+                    Circle().fill(Color.green).frame(width: 22, height: 22)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
                 }
             }
-            .buttonStyle(.plain)
+            .frame(width: 34, height: 34)
+            .contentShape(Circle())
+            .onTapGesture {
+                item.isPurchased.toggle()
+                try? modelContext.save()
+            }
 
             // 제품 정보
             VStack(alignment: .leading, spacing: 3) {
