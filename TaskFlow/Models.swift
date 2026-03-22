@@ -64,6 +64,7 @@ class Task {
     var dueDate: Date?
     var project: Project?
     var timeEntries: [TimeEntry]
+    @Relationship(deleteRule: .nullify, inverse: \Tag.tasks)
     var tags: [Tag] = []
 
     init(title: String, notes: String = "", project: Project? = nil, dueDate: Date? = nil) {
