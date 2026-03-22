@@ -189,10 +189,12 @@ struct ProjectSection: View {
 
 struct TaskRow: View {
     @Environment(\.modelContext) private var modelContext
-    var task: Task
+    @Bindable var task: Task
     var project: Project
     var timerManager: TimerManager
     @State private var isExpanded = false
+    @State private var showEdit = false
+    @State private var showDeleteAlert = false
 
     var isRunning: Bool { timerManager.isRunning(task: task) }
     var checkColor: Color { Color(hex: project.colorHex) ?? .blue }
