@@ -12,7 +12,8 @@ struct TaskFlowApp: App {
             WishItem.self, Transaction.self, MonthlyBudget.self,
             SavingsAccount.self, SavingsPayment.self,
             ScheduledTransaction.self,
-            NoteDocument.self, SpreadsheetCell.self, MindMapNode.self
+            NoteDocument.self, SpreadsheetCell.self, MindMapNode.self,
+            Tag.self
         ])
         let storeURL = Self.resolveStoreURL()
         let config = ModelConfiguration(schema: schema, url: storeURL)
