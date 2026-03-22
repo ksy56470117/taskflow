@@ -457,3 +457,124 @@ extension Color {
         )
     }
 }
+
+// MARK: - 태스크 편집 시트 (공유)
+struct TaskEditSheet: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @Bindable var task: Task
+
+    @State private var title: String = ""
+    @State private var notes: String = ""
+    @State private var dueDate: Date = Date()
+    @State private var hasDueDate: Bool = false
+    @FocusState private var titleFocused: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 핸들
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color.secondary.opacity(0.3))
+                .frame(width: 36, height: 5)
+                .padding(.top, 10)
+                .padding(.bottom, 14)
+
+            // 제목
+            TextField("제목", text: $title)
+                .focused($titleFocused)
+                .font(.system(size: 17, weight: .semibold))
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
+
+            Divider()
+
+            // 메모
+            HStack(spacing: 10) {
+                Image(systemName: "text.alignleft")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22)
+                TextField("메모", text: $notes, axis: .vertical)
+                    .font(.system(size: 14))
+                    .lineLimit(3, reservesSpace: false)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+
+            Divider()
+
+            // 마감일
+            HStack(spacing: 10) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22)
+                Toggle(isOn: $hasDueDate) {
+                    Text("마감일")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.primary)
+                }
+                .toggleStyle(.switch)
+                .tint(.blue)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+
+            if hasDueDate {
+                DatePicker("", selection: $dueDate, displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 4)
+            }
+
+            Divider()
+            Spacer()
+
+            // 버튼
+            HStack(spacing: 10) {
+                Button { dismiss() } label: {
+                    Text("취소")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(Color.secondary.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    let trimmed = title.trimmingCharacters(in: .whitespaces)
+                    guard !trimmed.isEmpty else { return }
+                    task.title = trimmed
+                    task.notes = notes
+                    task.dueDate = hasDueDate ? dueDate : nil
+                    try? modelContext.save()
+                    dismiss()
+                } label: {
+                    Text("저장")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(Color.blue)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+                .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
+        }
+        .background(.background)
+        .onAppear {
+            title = task.title
+            notes = task.notes
+            if let d = task.dueDate {
+                hasDueDate = true
+                dueDate = d
+            }
+            titleFocused = true
+        }
+    }
+}
