@@ -168,35 +168,63 @@ struct DayCell: View {
     var isCurrentMonth: Bool
     var isToday: Bool
     var isSelected: Bool
-    var dotColors: [Color]
+    var tasks: [Task]
+    var colIndex: Int = 0
+
+    var dayNum: Int { Calendar.current.component(.day, from: date) }
+    var numColor: Color {
+        if isSelected { return .white }
+        if isToday    { return .blue }
+        if !isCurrentMonth { return Color.primary.opacity(0.18) }
+        if colIndex == 0 { return Color.red.opacity(0.8) }
+        if colIndex == 6 { return Color.blue.opacity(0.8) }
+        return .primary
+    }
 
     var body: some View {
-        VStack(spacing: 3) {
+        VStack(alignment: .leading, spacing: 2) {
+            // 날짜 숫자
             ZStack {
                 if isSelected {
-                    Circle().fill(Color.blue).frame(width: 30, height: 30)
+                    Circle().fill(Color.blue).frame(width: 24, height: 24)
                 } else if isToday {
-                    Circle().stroke(Color.blue, lineWidth: 1.5).frame(width: 30, height: 30)
+                    Circle().stroke(Color.blue, lineWidth: 1.5).frame(width: 24, height: 24)
                 }
-                Text("\(Calendar.current.component(.day, from: date))")
-                    .font(.system(size: 14, weight: isToday || isSelected ? .semibold : .regular))
-                    .foregroundStyle(
-                        isSelected ? Color.white :
-                        isToday ? Color.blue :
-                        isCurrentMonth ? Color.primary : Color.primary.opacity(0.2)
-                    )
+                Text("\(dayNum)")
+                    .font(.system(size: 12, weight: isToday || isSelected ? .bold : .regular))
+                    .foregroundStyle(numColor)
             }
-            .frame(width: 34, height: 34)
+            .frame(width: 24, height: 24)
 
-            HStack(spacing: 2) {
-                ForEach(dotColors.prefix(3), id: \.self) { color in
-                    Circle().fill(color).frame(width: 4, height: 4)
+            // 태스크 칩
+            ForEach(tasks) { task in
+                let col: Color = task.project.flatMap { Color(hex: $0.colorHex) } ?? Color.gray
+                HStack(spacing: 2) {
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(col)
+                        .frame(width: 2.5)
+                        .frame(maxHeight: .infinity)
+                    Text(task.title)
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(
+                            task.isCompleted
+                                ? Color.secondary.opacity(0.6)
+                                : (isCurrentMonth ? Color.primary : Color.secondary)
+                        )
+                        .strikethrough(task.isCompleted, color: .secondary)
+                        .lineLimit(nil)          // 줄넘김 제한 없음
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
                 }
+                .padding(.horizontal, 3)
+                .padding(.vertical, 2)
+                .background(col.opacity(0.10))
+                .clipShape(RoundedRectangle(cornerRadius: 3))
             }
-            .frame(height: 6)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 2)
+        .padding(.horizontal, 3)
+        .padding(.vertical, 5)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
 
