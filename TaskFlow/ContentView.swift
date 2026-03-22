@@ -35,9 +35,9 @@ struct iOSContentView: View {
             .tabItem { Label("오늘", systemImage: "star") }.tag(0)
 
             NavigationStack {
-                StatsView().navigationTitle("통계").navigationBarTitleDisplayMode(.large)
+                UpcomingView().navigationTitle("Upcoming").navigationBarTitleDisplayMode(.large)
             }
-            .tabItem { Label("통계", systemImage: "chart.bar") }.tag(1)
+            .tabItem { Label("Upcoming", systemImage: "calendar.badge.clock") }.tag(1)
 
             NavigationStack {
                 CalendarView().navigationTitle("캘린더").navigationBarTitleDisplayMode(.large)
@@ -45,19 +45,24 @@ struct iOSContentView: View {
             .tabItem { Label("캘린더", systemImage: "calendar") }.tag(2)
 
             NavigationStack {
+                StatsView().navigationTitle("통계").navigationBarTitleDisplayMode(.large)
+            }
+            .tabItem { Label("통계", systemImage: "chart.bar") }.tag(3)
+
+            NavigationStack {
                 SpendingView()
             }
-            .tabItem { Label("가계부", systemImage: "wonsign.circle") }.tag(3)
+            .tabItem { Label("가계부", systemImage: "wonsign.circle") }.tag(4)
 
             NavigationStack {
                 WishlistView()
             }
-            .tabItem { Label("위시리스트", systemImage: "heart") }.tag(4)
+            .tabItem { Label("위시리스트", systemImage: "heart") }.tag(5)
 
             NavigationStack {
                 NotesView()
             }
-            .tabItem { Label("노트", systemImage: "note.text") }.tag(5)
+            .tabItem { Label("노트", systemImage: "note.text") }.tag(6)
         }
         .onAppear { timerManager.setup(context: modelContext) }
     }
