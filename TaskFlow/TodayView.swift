@@ -40,7 +40,13 @@ struct TodayView: View {
 
     var completedCount: Int { allTasks.filter { $0.isCompleted }.count }
     var totalCount: Int { allTasks.count }
-    var pendingCount: Int { allTasks.filter { !$0.isCompleted }.count }
+    var pendingCount: Int {
+        allTasks.filter { task in
+            guard !task.isCompleted else { return false }
+            if let due = task.dueDate { return Calendar.current.isDateInToday(due) }
+            return true
+        }.count
+    }
 
     var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
