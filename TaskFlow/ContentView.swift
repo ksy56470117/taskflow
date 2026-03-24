@@ -89,7 +89,7 @@ struct MacContentView: View {
                     sidebarTapCount += 1
                 }
             )
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 220)
+            .navigationSplitViewColumnWidth(min: 140, ideal: 160, max: 180)
         } detail: {
             Group {
                 switch selection {
