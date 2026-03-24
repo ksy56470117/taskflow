@@ -148,7 +148,7 @@ struct ThingsSidebar: View {
     var body: some View {
         List(selection: $selection) {
             // LIFE
-            Section("Life") {
+            Section(content: {
                 Label("오늘", systemImage: "star.fill")
                     .foregroundStyle(.primary).lineLimit(1)
                     .padding(.leading, 4)
@@ -179,10 +179,12 @@ struct ThingsSidebar: View {
                     .listRowInsets(EdgeInsets(top: 2, leading: 10, bottom: 2, trailing: 6))
                     .tag(SidebarItem.wishlist)
                     .simultaneousGesture(TapGesture().onEnded { onTap?(.wishlist) })
-            }
+            }, header: {
+                Text("Life").padding(.leading, 4)
+            })
 
             // STUDY
-            Section("Study") {
+            Section(content: {
                 Label("통계", systemImage: "chart.bar.fill")
                     .foregroundStyle(.primary).lineLimit(1)
                     .padding(.leading, 4)
@@ -195,11 +197,13 @@ struct ThingsSidebar: View {
                     .listRowInsets(EdgeInsets(top: 2, leading: 10, bottom: 2, trailing: 6))
                     .tag(SidebarItem.studyPlan)
                     .simultaneousGesture(TapGesture().onEnded { onTap?(.studyPlan) })
-            }
+            }, header: {
+                Text("Study").padding(.leading, 4)
+            })
 
             // Area별 프로젝트
             ForEach(areas.sorted { $0.order < $1.order }) { area in
-                Section {
+                Section(content: {
                     // Area 행
                     HStack(spacing: 8) {
                         Image(systemName: "tray.2")
@@ -245,12 +249,12 @@ struct ThingsSidebar: View {
                         .tag(SidebarItem.project(project.id))
                         .simultaneousGesture(TapGesture().onEnded { onTap?(.project(project.id)) })
                     }
-                }
+                })
             }
 
             // Area 없는 프로젝트
             if !looseProjects.isEmpty {
-                Section("프로젝트") {
+                Section(content: {
                     ForEach(looseProjects) { project in
                         HStack(spacing: 8) {
                             Image(systemName: "folder.fill")
@@ -267,7 +271,9 @@ struct ThingsSidebar: View {
                         .tag(SidebarItem.project(project.id))
                         .simultaneousGesture(TapGesture().onEnded { onTap?(.project(project.id)) })
                     }
-                }
+                }, header: {
+                    Text("프로젝트").padding(.leading, 4)
+                })
             }
         }
         .listStyle(.sidebar)
