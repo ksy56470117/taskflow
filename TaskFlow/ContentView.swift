@@ -89,7 +89,7 @@ struct MacContentView: View {
                     sidebarTapCount += 1
                 }
             )
-            .navigationSplitViewColumnWidth(min: 140, ideal: 160, max: 180)
+            .navigationSplitViewColumnWidth(min: 160, ideal: 175, max: 200)
         } detail: {
             Group {
                 switch selection {
@@ -150,23 +150,23 @@ struct ThingsSidebar: View {
             // LIFE
             Section("Life") {
                 Label("오늘", systemImage: "star.fill")
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.primary).lineLimit(1)
                     .tag(SidebarItem.today)
                     .simultaneousGesture(TapGesture().onEnded { onTap?(.today) })
                 Label("Upcoming", systemImage: "calendar.badge.clock")
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.primary).lineLimit(1)
                     .tag(SidebarItem.upcoming)
                     .simultaneousGesture(TapGesture().onEnded { onTap?(.upcoming) })
                 Label("캘린더", systemImage: "calendar")
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.primary).lineLimit(1)
                     .tag(SidebarItem.calendar)
                     .simultaneousGesture(TapGesture().onEnded { onTap?(.calendar) })
                 Label("가계부", systemImage: "wonsign.circle.fill")
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.primary).lineLimit(1)
                     .tag(SidebarItem.spending)
                     .simultaneousGesture(TapGesture().onEnded { onTap?(.spending) })
                 Label("위시리스트", systemImage: "heart")
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.primary).lineLimit(1)
                     .tag(SidebarItem.wishlist)
                     .simultaneousGesture(TapGesture().onEnded { onTap?(.wishlist) })
             }
@@ -174,11 +174,11 @@ struct ThingsSidebar: View {
             // STUDY
             Section("Study") {
                 Label("통계", systemImage: "chart.bar.fill")
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.primary).lineLimit(1)
                     .tag(SidebarItem.stats)
                     .simultaneousGesture(TapGesture().onEnded { onTap?(.stats) })
                 Label("학습 계획", systemImage: "books.vertical.fill")
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.primary).lineLimit(1)
                     .tag(SidebarItem.studyPlan)
                     .simultaneousGesture(TapGesture().onEnded { onTap?(.studyPlan) })
             }
