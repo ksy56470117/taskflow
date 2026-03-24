@@ -80,7 +80,7 @@ struct CalendarView: View {
                                     )
                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                                     .contentShape(Rectangle())
-                                    .onTapGesture { selectedDate = date }
+                                    .simultaneousGesture(TapGesture().onEnded { selectedDate = date })
                                     if di < 6 { Divider() }
                                 }
                             }
@@ -165,6 +165,7 @@ struct CalendarView: View {
 
 
 struct DayCell: View {
+    @Environment(\.modelContext) private var modelContext
     var date: Date
     var isCurrentMonth: Bool
     var isToday: Bool
@@ -202,27 +203,34 @@ struct DayCell: View {
                 let col: Color = task.tags.first.flatMap { Color(hex: $0.colorHex) }
                     ?? task.project.flatMap { Color(hex: $0.colorHex) }
                     ?? Color.gray
-                HStack(spacing: 2) {
-                    RoundedRectangle(cornerRadius: 1)
-                        .fill(col)
-                        .frame(width: 2)
-                        .frame(maxHeight: .infinity)
-                    Text(task.title)
-                        .font(.system(size: 8))
-                        .foregroundStyle(
-                            task.isCompleted
-                                ? Color.secondary.opacity(0.5)
-                                : (isCurrentMonth ? Color.primary.opacity(0.85) : Color.secondary)
-                        )
-                        .strikethrough(task.isCompleted, color: .secondary)
-                        .lineLimit(nil)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .multilineTextAlignment(.leading)
+                Button {
+                    task.isCompleted.toggle()
+                    try? modelContext.save()
+                } label: {
+                    HStack(spacing: 2) {
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(col)
+                            .frame(width: 2)
+                            .frame(maxHeight: .infinity)
+                        Text(task.title)
+                            .font(.system(size: 8))
+                            .foregroundStyle(
+                                task.isCompleted
+                                    ? Color.secondary.opacity(0.5)
+                                    : (isCurrentMonth ? Color.primary.opacity(0.85) : Color.secondary)
+                            )
+                            .strikethrough(task.isCompleted, color: .secondary)
+                            .lineLimit(nil)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
+                    }
+                    .padding(.horizontal, 2)
+                    .padding(.vertical, 1)
+                    .background(col.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 2))
+                    .contentShape(Rectangle())
                 }
-                .padding(.horizontal, 2)
-                .padding(.vertical, 1)
-                .background(col.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 2))
+                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 2)
@@ -259,6 +267,8 @@ struct CalendarTaskRow: View {
                             .foregroundStyle(.white)
                     }
                 }
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
@@ -266,7 +276,7 @@ struct CalendarTaskRow: View {
                 Text(task.title)
                     .font(.system(size: 14))
                     .foregroundStyle(task.isCompleted ? Color.secondary : Color.primary)
-                    .strikethrough(task.isCompleted)
+                    .strikethrough(task.isCompleted, color: Color.secondary.opacity(0.6))
                 HStack(spacing: 4) {
                     if let proj = task.project {
                         Text(proj.name).font(.system(size: 12)).foregroundStyle(.secondary)

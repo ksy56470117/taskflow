@@ -10,9 +10,10 @@ struct TodayView: View {
 
     func isForToday(_ task: Task) -> Bool {
         if let due = task.dueDate {
-            return Calendar.current.isDateInToday(due)
+            if Calendar.current.isDateInToday(due) { return true }
+            return due < Date() && !task.isCompleted  // 오늘 이전 미완료 (overdue)
         }
-        return !task.isCompleted  // 날짜 없는 태스크는 미완료만 표시
+        return !task.isCompleted
     }
 
     var orphanPending: [Task] {
