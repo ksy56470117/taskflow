@@ -59,10 +59,6 @@ struct iOSContentView: View {
             }
             .tabItem { Label("위시리스트", systemImage: "heart") }.tag(5)
 
-            NavigationStack {
-                NotesView()
-            }
-            .tabItem { Label("노트", systemImage: "note.text") }.tag(6)
         }
         .onAppear { timerManager.setup(context: modelContext) }
     }
@@ -110,8 +106,6 @@ struct MacContentView: View {
                     SpendingView()
                 case .wishlist:
                     WishlistView()
-                case .notes:
-                    NotesView()
                 case .project(let id):
                     if let project = projects.first(where: { $0.id == id }) {
                         ProjectDetailView(project: project, timerManager: timerManager)
@@ -136,7 +130,7 @@ struct MacContentView: View {
 
 // MARK: - Sidebar Item
 enum SidebarItem: Hashable {
-    case today, upcoming, stats, calendar, studyPlan, spending, wishlist, notes
+    case today, upcoming, stats, calendar, studyPlan, spending, wishlist
     case area(UUID)
     case project(UUID)
 }
@@ -186,10 +180,6 @@ struct ThingsSidebar: View {
                     .foregroundStyle(.primary)
                     .tag(SidebarItem.studyPlan)
                     .simultaneousGesture(TapGesture().onEnded { onTap?(.studyPlan) })
-                Label("노트", systemImage: "note.text")
-                    .foregroundStyle(.primary)
-                    .tag(SidebarItem.notes)
-                    .simultaneousGesture(TapGesture().onEnded { onTap?(.notes) })
             }
 
             // Area별 프로젝트
