@@ -200,17 +200,17 @@ struct ThingsSidebar: View {
                     // Area 행
                     HStack(spacing: 8) {
                         Image(systemName: "tray.2")
-                            .font(.system(size: 13))
+                            .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                         Text(area.name)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(.primary)
                         Spacer()
                         Button {
                             showAddProject = area
                         } label: {
                             Image(systemName: "plus")
-                                .font(.system(size: 11))
+                                .font(.system(size: 10))
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
@@ -219,27 +219,50 @@ struct ThingsSidebar: View {
                     .tag(SidebarItem.area(area.id))
                     .simultaneousGesture(TapGesture().onEnded { onTap?(.area(area.id)) })
 
-                    // 하위 프로젝트
-                    ForEach(area.projects.sorted { $0.order < $1.order }) { project in
+                    // 하위 프로젝트 (최상위만)
+                    ForEach(area.projects.filter { $0.parentProject == nil }.sorted { $0.order < $1.order }) { project in
                         HStack(spacing: 8) {
                             Image(systemName: "folder.fill")
-                                .font(.system(size: 11))
+                                .font(.system(size: 10))
                                 .foregroundStyle(Color(hex: project.colorHex) ?? .blue)
                                 .padding(.leading, 8)
                             Text(project.name)
-                                .font(.system(size: 13))
+                                .font(.system(size: 12))
                                 .lineLimit(1)
                             Spacer()
                             let pending = project.pendingCount
                             if pending > 0 {
                                 Text("\(pending)")
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 11))
                                     .foregroundStyle(.secondary)
                             }
                         }
                         .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                         .tag(SidebarItem.project(project.id))
                         .simultaneousGesture(TapGesture().onEnded { onTap?(.project(project.id)) })
+
+                        // 서브 프로젝트 (한 계층 더)
+                        ForEach(project.subProjects.sorted { $0.order < $1.order }) { sub in
+                            HStack(spacing: 8) {
+                                Image(systemName: "folder.fill")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(Color(hex: sub.colorHex) ?? .blue)
+                                    .padding(.leading, 20)
+                                Text(sub.name)
+                                    .font(.system(size: 11))
+                                    .lineLimit(1)
+                                Spacer()
+                                let subPending = sub.pendingCount
+                                if subPending > 0 {
+                                    Text("\(subPending)")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .listRowInsets(EdgeInsets(top: 1, leading: 18, bottom: 1, trailing: 6))
+                            .tag(SidebarItem.project(sub.id))
+                            .simultaneousGesture(TapGesture().onEnded { onTap?(.project(sub.id)) })
+                        }
                     }
                 })
             }
