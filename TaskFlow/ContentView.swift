@@ -975,7 +975,7 @@ struct ThingsTaskRow: View {
                 // 제목 + 서브텍스트 — 클릭하면 펼치기
                 VStack(alignment: .leading, spacing: 3) {
                     Text(task.title)
-                        .font(.system(size: 15))
+                        .font(.system(size: 13))
                         .foregroundStyle(task.isCompleted ? Color.secondary : Color.primary)
                         .strikethrough(task.isCompleted, color: Color.secondary.opacity(0.5))
 
