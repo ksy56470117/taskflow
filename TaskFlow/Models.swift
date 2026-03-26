@@ -40,7 +40,7 @@ class Project {
     @Relationship(deleteRule: .cascade) var subProjects: [Project] = []
 
     // 프로젝트에 연결된 노트 문서
-    @Relationship(deleteRule: .cascade) var noteDocuments: [NoteDocument] = []
+    @Relationship(deleteRule: .cascade, inverse: \NoteDocument.project) var noteDocuments: [NoteDocument] = []
 
     init(name: String, colorHex: String = "007AFF", area: Area? = nil, order: Int = 0) {
         self.id = UUID()
