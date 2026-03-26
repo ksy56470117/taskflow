@@ -84,7 +84,6 @@ struct AddProjectSheet: View {
     @FocusState private var focused: Bool
 
     var area: Area? = nil
-    var parentProject: Project? = nil
 
     @State private var name = ""
     @State private var selectedColor = "A8C8E8"
