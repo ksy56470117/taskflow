@@ -8,33 +8,29 @@ struct NotesView: View {
     @Query(sort: \NoteDocument.updatedAt, order: .reverse) private var documents: [NoteDocument]
     @State private var showingAdd = false
     @State private var newTitle = ""
-    @State private var newType = "spreadsheet"
+    @State private var openNote: NoteDocument? = nil
 
     var body: some View {
         List {
             ForEach(documents) { doc in
-                NavigationLink {
-                    if doc.type == "spreadsheet" {
-                        SpreadsheetEditorView(document: doc)
-                    } else {
-                        MindMapEditorView(document: doc)
-                    }
-                } label: {
+                Button { openNote = doc } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: doc.type == "spreadsheet" ? "tablecells" : "circle.hexagongrid")
+                        Image(systemName: noteIcon(doc))
                             .font(.title3)
-                            .foregroundStyle(doc.type == "spreadsheet" ? .green : .purple)
+                            .foregroundStyle(noteColor(doc))
                             .frame(width: 32)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(doc.title)
                                 .font(.body)
-                            Text(doc.type == "spreadsheet" ? "스프레드시트" : "마인드맵")
+                                .foregroundStyle(.primary)
+                            Text(noteSubtitle(doc))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
                     .padding(.vertical, 4)
                 }
+                .buttonStyle(.plain)
             }
             .onDelete { idxs in idxs.forEach { modelContext.delete(documents[$0]) } }
 
@@ -42,7 +38,7 @@ struct NotesView: View {
                 ContentUnavailableView(
                     "노트 없음",
                     systemImage: "note.text",
-                    description: Text("+ 버튼으로 스프레드시트 또는 마인드맵을 추가하세요")
+                    description: Text("+ 버튼으로 노트를 추가하세요")
                 )
                 .listRowBackground(Color.clear)
             }
@@ -54,49 +50,58 @@ struct NotesView: View {
             }
         }
         .sheet(isPresented: $showingAdd) {
+            AddNoteSheet(title: $newTitle) {
+                let doc = NoteDocument(title: newTitle, type: "note")
+                modelContext.insert(doc)
+                try? modelContext.save()
+                showingAdd = false
+                newTitle = ""
+                openNote = doc
+            } onCancel: { showingAdd = false; newTitle = "" }
+        }
+        .sheet(item: $openNote) { note in
             NavigationStack {
-                Form {
-                    Section("제목") {
-                        TextField("새 노트", text: $newTitle)
-                    }
-                    Section("종류") {
-                        Picker("종류", selection: $newType) {
-                            Label("스프레드시트", systemImage: "tablecells").tag("spreadsheet")
-                            Label("마인드맵", systemImage: "circle.hexagongrid").tag("mindmap")
+                noteEditorView(for: note)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("닫기") { openNote = nil }
                         }
-                        .pickerStyle(.inline)
-                        .labelsHidden()
                     }
-                }
-                .navigationTitle("새 노트")
-                #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
-                #endif
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("취소") { showingAdd = false; newTitle = "" }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("추가") { addDocument() }
-                            .disabled(newTitle.isEmpty)
-                    }
-                }
             }
-            .presentationDetents([.medium])
         }
     }
 
-    func addDocument() {
-        let doc = NoteDocument(title: newTitle, type: newType)
-        modelContext.insert(doc)
-        if newType == "mindmap" {
-            let root = MindMapNode(text: newTitle, x: 300, y: 300)
-            root.document = doc
-            doc.mapNodes.append(root)
-            modelContext.insert(root)
+    @ViewBuilder
+    func noteEditorView(for doc: NoteDocument) -> some View {
+        switch doc.type {
+        case "spreadsheet": SpreadsheetEditorView(document: doc)
+        case "mindmap":     MindMapEditorView(document: doc)
+        default:            NoteEditorView(document: doc)
         }
-        showingAdd = false
-        newTitle = ""
+    }
+
+    func noteIcon(_ doc: NoteDocument) -> String {
+        switch doc.type {
+        case "spreadsheet": return "tablecells"
+        case "mindmap":     return "circle.hexagongrid"
+        default:            return "doc.text"
+        }
+    }
+    func noteColor(_ doc: NoteDocument) -> Color {
+        switch doc.type {
+        case "spreadsheet": return .green
+        case "mindmap":     return .purple
+        default:            return .blue
+        }
+    }
+    func noteSubtitle(_ doc: NoteDocument) -> String {
+        switch doc.type {
+        case "spreadsheet": return "스프레드시트"
+        case "mindmap":     return "마인드맵"
+        default:
+            let count = doc.blocks.count
+            return count > 0 ? "노트 \(count)개 항목" : "빈 노트"
+        }
     }
 }
 
