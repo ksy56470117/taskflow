@@ -126,7 +126,6 @@ struct MacContentView: View {
         .navigationSplitViewStyle(.balanced)
         .sheet(isPresented: $showAddArea) { AddAreaSheet() }
         .sheet(item: $showAddProject) { AddProjectSheet(area: $0) }
-        .sheet(item: $showAddSubProject) { AddProjectSheet(parentProject: $0) }
     }
 }
 
