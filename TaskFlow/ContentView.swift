@@ -892,195 +892,354 @@ struct ProjectDetailView: View {
     }
 }
 
-// MARK: - Sub Projects Section
-struct SubProjectsSection: View {
+// MARK: - Project Notes + Folders (통합 섹션)
+struct ProjectNotesAndFoldersSection: View {
+    @Environment(\.modelContext) private var modelContext
     @Bindable var project: Project
-    var onAddSubProject: (() -> Void)?
+    @State private var showAddNote = false
+    @State private var showAddFolder = false
+    @State private var newTitle = ""
+    @State private var openNote: NoteDocument? = nil
+    @State private var openFolder: NoteFolder? = nil
+
+    // 폴더 없는 직접 노트
+    var directNotes: [NoteDocument] {
+        project.noteDocuments
+            .filter { $0.folder == nil }
+            .sorted { $0.updatedAt > $1.updatedAt }
+    }
+    var sortedFolders: [NoteFolder] {
+        project.noteFolders.sorted { $0.order < $1.order }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // 섹션 헤더
             HStack {
-                Text("서브 폴더")
+                Text("노트")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
-                if let onAdd = onAddSubProject {
-                    Button { onAdd() } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                Menu {
+                    Button { showAddNote = true } label: {
+                        Label("새 노트", systemImage: "doc.text")
                     }
-                    .buttonStyle(.plain)
+                    Button { showAddFolder = true } label: {
+                        Label("새 폴더", systemImage: "folder")
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                 }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
             }
             .padding(.horizontal, 32)
             .padding(.top, 16)
             .padding(.bottom, 8)
 
-            ForEach(project.subProjects.sorted { $0.order < $1.order }) { sub in
-                HStack(spacing: 10) {
-                    Image(systemName: "folder.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color(hex: sub.colorHex) ?? .blue)
-                    Text(sub.name)
-                        .font(.system(size: 13))
-                    Spacer()
-                    if sub.pendingCount > 0 {
-                        Text("\(sub.pendingCount)")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.horizontal, 32)
-                .padding(.vertical, 8)
-                .overlay(alignment: .bottom) { Divider().padding(.leading, 32) }
+            // 폴더들
+            ForEach(sortedFolders) { folder in
+                NoteFolderRow(folder: folder, onOpen: { openFolder = folder }, onDelete: {
+                    project.noteFolders.removeAll { $0.id == folder.id }
+                    modelContext.delete(folder)
+                    try? modelContext.save()
+                })
             }
 
-            if project.subProjects.isEmpty {
-                Text("+ 버튼으로 서브 폴더를 추가하세요")
+            // 폴더 없는 직접 노트들
+            ForEach(directNotes) { note in
+                NoteDocumentRow(note: note, onOpen: { openNote = note }, onDelete: {
+                    project.noteDocuments.removeAll { $0.id == note.id }
+                    modelContext.delete(note)
+                    try? modelContext.save()
+                })
+            }
+
+            if directNotes.isEmpty && sortedFolders.isEmpty {
+                Text("+ 버튼으로 노트 또는 폴더를 추가하세요")
                     .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
                     .padding(.horizontal, 32)
                     .padding(.bottom, 10)
+            }
+        }
+        // 새 노트 시트
+        .sheet(isPresented: $showAddNote) {
+            AddNoteSheet(title: $newTitle) {
+                let doc = NoteDocument(title: newTitle, type: "note")
+                doc.project = project
+                modelContext.insert(doc)
+                project.noteDocuments.append(doc)
+                try? modelContext.save()
+                showAddNote = false
+                newTitle = ""
+                openNote = doc
+            } onCancel: {
+                showAddNote = false; newTitle = ""
+            }
+        }
+        // 새 폴더 시트
+        .sheet(isPresented: $showAddFolder) {
+            AddNoteSheet(title: $newTitle, placeholder: "폴더 이름") {
+                let folder = NoteFolder(name: newTitle, order: project.noteFolders.count, project: project)
+                modelContext.insert(folder)
+                project.noteFolders.append(folder)
+                try? modelContext.save()
+                showAddFolder = false
+                newTitle = ""
+            } onCancel: {
+                showAddFolder = false; newTitle = ""
+            }
+        }
+        // 노트 열기
+        .sheet(item: $openNote) { note in
+            NavigationStack {
+                NoteEditorView(document: note)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("닫기") { openNote = nil }
+                        }
+                    }
+            }
+        }
+        // 폴더 열기
+        .sheet(item: $openFolder) { folder in
+            NoteFolderView(folder: folder)
+        }
+    }
+}
+
+// MARK: - Note Folder Row
+struct NoteFolderRow: View {
+    @Bindable var folder: NoteFolder
+    var onOpen: () -> Void
+    var onDelete: () -> Void
+
+    var body: some View {
+        Button { onOpen() } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.orange)
+                    .frame(width: 20)
+                Text(folder.name)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text("\(folder.notes.count)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 32)
+        .padding(.vertical, 8)
+        .overlay(alignment: .bottom) { Divider().padding(.leading, 32) }
+        .contextMenu {
+            Button(role: .destructive) { onDelete() } label: {
+                Label("폴더 삭제", systemImage: "trash")
             }
         }
     }
 }
 
-// MARK: - Project Notes Section
-struct ProjectNotesSection: View {
-    @Environment(\.modelContext) private var modelContext
-    @Bindable var project: Project
-    @State private var showAddNote = false
-    @State private var newNoteTitle = ""
-    @State private var newNoteType = "spreadsheet"
-    @State private var openNote: NoteDocument? = nil
+// MARK: - Note Document Row
+struct NoteDocumentRow: View {
+    var note: NoteDocument
+    var onOpen: () -> Void
+    var onDelete: () -> Void
 
-    var sortedNotes: [NoteDocument] {
-        project.noteDocuments.sorted { $0.updatedAt > $1.updatedAt }
+    var noteIcon: String {
+        switch note.type {
+        case "mindmap": return "circle.hexagongrid"
+        case "spreadsheet": return "tablecells"
+        default: return "doc.text"
+        }
+    }
+    var noteColor: Color {
+        switch note.type {
+        case "mindmap": return .purple
+        case "spreadsheet": return .green
+        default: return .blue
+        }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("필기노트")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button { showAddNote = true } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 32)
-            .padding(.top, 16)
-            .padding(.bottom, 8)
-
-            ForEach(sortedNotes) { note in
-                Button {
-                    openNote = note
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: note.type == "spreadsheet" ? "tablecells" : "circle.hexagongrid")
-                            .font(.system(size: 12))
-                            .foregroundStyle(note.type == "spreadsheet" ? Color.green : Color.purple)
-                            .frame(width: 20)
-                        Text(note.title)
-                            .font(.system(size: 13))
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Text(note.type == "spreadsheet" ? "표" : "맵")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 32)
-                .padding(.vertical, 8)
-                .overlay(alignment: .bottom) { Divider().padding(.leading, 32) }
-                .contextMenu {
-                    Button(role: .destructive) {
-                        project.noteDocuments.removeAll { $0.id == note.id }
-                        modelContext.delete(note)
-                        try? modelContext.save()
-                    } label: {
-                        Label("삭제", systemImage: "trash")
-                    }
-                }
-            }
-
-            if sortedNotes.isEmpty {
-                Text("+ 버튼으로 스프레드시트 또는 마인드맵을 추가하세요")
+        Button { onOpen() } label: {
+            HStack(spacing: 10) {
+                Image(systemName: noteIcon)
                     .font(.system(size: 12))
-                    .foregroundStyle(.tertiary)
-                    .padding(.horizontal, 32)
-                    .padding(.bottom, 10)
+                    .foregroundStyle(noteColor)
+                    .frame(width: 20)
+                Text(note.title)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text(formatDate(note.updatedAt))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
             }
         }
-        .sheet(isPresented: $showAddNote) {
-            NavigationStack {
-                Form {
-                    Section("제목") {
-                        TextField("노트 제목", text: $newNoteTitle)
-                    }
-                    Section("종류") {
-                        Picker("종류", selection: $newNoteType) {
-                            Label("스프레드시트", systemImage: "tablecells").tag("spreadsheet")
-                            Label("마인드맵", systemImage: "circle.hexagongrid").tag("mindmap")
-                        }
-                        .pickerStyle(.inline)
-                        .labelsHidden()
-                    }
-                }
-                .navigationTitle("새 필기노트")
-                #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
-                #endif
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("취소") { showAddNote = false; newNoteTitle = "" }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("추가") { addNote() }.disabled(newNoteTitle.isEmpty)
-                    }
-                }
-            }
-            .presentationDetents([.medium])
-        }
-        .sheet(item: $openNote) { note in
-            NavigationStack {
-                Group {
-                    if note.type == "spreadsheet" {
-                        SpreadsheetEditorView(document: note)
-                    } else {
-                        MindMapEditorView(document: note)
-                    }
-                }
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("닫기") { openNote = nil }
-                    }
-                }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 32)
+        .padding(.vertical, 8)
+        .overlay(alignment: .bottom) { Divider().padding(.leading, 32) }
+        .contextMenu {
+            Button(role: .destructive) { onDelete() } label: {
+                Label("삭제", systemImage: "trash")
             }
         }
     }
 
-    func addNote() {
-        let doc = NoteDocument(title: newNoteTitle, type: newNoteType)
-        doc.project = project
-        modelContext.insert(doc)
-        if newNoteType == "mindmap" {
-            let root = MindMapNode(text: newNoteTitle, x: 300, y: 300)
-            root.document = doc
-            doc.mapNodes.append(root)
-            modelContext.insert(root)
+    func formatDate(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "M/d"
+        return f.string(from: d)
+    }
+}
+
+// MARK: - Add Note/Folder Sheet
+struct AddNoteSheet: View {
+    @Binding var title: String
+    var placeholder: String = "노트 제목"
+    var onConfirm: () -> Void
+    var onCancel: () -> Void
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                ZStack(alignment: .leading) {
+                    if title.isEmpty {
+                        Text(placeholder)
+                            .font(.system(size: 15))
+                            .foregroundStyle(Color.primary.opacity(0.28))
+                    }
+                    TextField("", text: $title)
+                        .font(.system(size: 15))
+                        .textFieldStyle(.plain)
+                        .focused($focused)
+                        .onSubmit { if !title.isEmpty { onConfirm() } }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 12)
+
+            Divider().opacity(0.4)
+
+            HStack {
+                Button { onCancel() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Color.secondary)
+                        .frame(width: 22, height: 22)
+                        .background(Color.secondary.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                Spacer()
+                Button { onConfirm() } label: {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(title.isEmpty ? Color.secondary : Color.white)
+                        .frame(width: 22, height: 22)
+                        .background(title.isEmpty ? Color.secondary.opacity(0.12) : Color.blue)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(title.isEmpty)
+                .keyboardShortcut(.return, modifiers: .command)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
         }
-        project.noteDocuments.append(doc)
-        try? modelContext.save()
-        showAddNote = false
-        newNoteTitle = ""
+        .frame(width: 260)
+        .background(.background)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.1), radius: 16, x: 0, y: 6)
+        .onAppear { focused = true }
+    }
+}
+
+// MARK: - Note Folder View (폴더 안 노트 목록)
+struct NoteFolderView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @Bindable var folder: NoteFolder
+    @State private var showAddNote = false
+    @State private var newTitle = ""
+    @State private var openNote: NoteDocument? = nil
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(folder.notes.sorted { $0.updatedAt > $1.updatedAt }) { note in
+                    Button { openNote = note } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.blue)
+                            Text(note.title)
+                                .font(.system(size: 14))
+                                .foregroundStyle(.primary)
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+                .onDelete { idxs in
+                    let sorted = folder.notes.sorted { $0.updatedAt > $1.updatedAt }
+                    idxs.forEach { i in
+                        let note = sorted[i]
+                        folder.notes.removeAll { $0.id == note.id }
+                        modelContext.delete(note)
+                    }
+                    try? modelContext.save()
+                }
+
+                if folder.notes.isEmpty {
+                    Text("노트가 없습니다")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .listRowBackground(Color.clear)
+                }
+            }
+            .navigationTitle(folder.name)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("닫기") { dismiss() }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button { showAddNote = true } label: { Image(systemName: "plus") }
+                }
+            }
+        }
+        .sheet(isPresented: $showAddNote) {
+            AddNoteSheet(title: $newTitle) {
+                let doc = NoteDocument(title: newTitle, type: "note")
+                doc.folder = folder
+                modelContext.insert(doc)
+                folder.notes.append(doc)
+                try? modelContext.save()
+                showAddNote = false
+                newTitle = ""
+                openNote = doc
+            } onCancel: { showAddNote = false; newTitle = "" }
+        }
+        .sheet(item: $openNote) { note in
+            NavigationStack {
+                NoteEditorView(document: note)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("닫기") { openNote = nil }
+                        }
+                    }
+            }
+        }
     }
 }
 
