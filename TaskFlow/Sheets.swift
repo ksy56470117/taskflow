@@ -108,7 +108,7 @@ struct AddProjectSheet: View {
 
                 ZStack(alignment: .leading) {
                     if name.isEmpty {
-                        Text(parentProject != nil ? "새 서브 폴더" : "새 프로젝트")
+                        Text("새 프로젝트")
                             .font(.system(size: 14))
                             .foregroundStyle(Color.primary.opacity(0.28))
                     }
@@ -119,16 +119,8 @@ struct AddProjectSheet: View {
                         .onSubmit { submit() }
                 }
 
-                Spacer()
-                if let parent = parentProject {
-                    Text("in \(parent.name)")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(Color.secondary.opacity(0.1))
-                        .clipShape(Capsule())
-                } else if let area = area {
+                if let area = area {
+                    Spacer()
                     Text(area.name)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
