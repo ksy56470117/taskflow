@@ -35,9 +35,9 @@ struct iOSContentView: View {
             .tabItem { Label("오늘", systemImage: "star") }.tag(0)
 
             NavigationStack {
-                StatsView().navigationTitle("통계").navigationBarTitleDisplayMode(.large)
+                UpcomingView().navigationTitle("Upcoming").navigationBarTitleDisplayMode(.large)
             }
-            .tabItem { Label("통계", systemImage: "chart.bar") }.tag(1)
+            .tabItem { Label("Upcoming", systemImage: "calendar.badge.clock") }.tag(1)
 
             NavigationStack {
                 CalendarView().navigationTitle("캘린더").navigationBarTitleDisplayMode(.large)
@@ -45,14 +45,20 @@ struct iOSContentView: View {
             .tabItem { Label("캘린더", systemImage: "calendar") }.tag(2)
 
             NavigationStack {
+                StatsView().navigationTitle("통계").navigationBarTitleDisplayMode(.large)
+            }
+            .tabItem { Label("통계", systemImage: "chart.bar") }.tag(3)
+
+            NavigationStack {
                 SpendingView()
             }
-            .tabItem { Label("가계부", systemImage: "wonsign.circle") }.tag(3)
+            .tabItem { Label("가계부", systemImage: "wonsign.circle") }.tag(4)
 
             NavigationStack {
                 WishlistView()
             }
-            .tabItem { Label("위시리스트", systemImage: "heart") }.tag(4)
+            .tabItem { Label("위시리스트", systemImage: "heart") }.tag(5)
+
         }
         .onAppear { timerManager.setup(context: modelContext) }
     }
@@ -68,21 +74,30 @@ struct MacContentView: View {
     var timerManager: TimerManager
 
     @State private var selection: SidebarItem? = .today
+    @State private var sidebarTapCount = 0
     @State private var showAddArea = false
     @State private var showAddProject: Area? = nil
+    @State private var showAddSubProject: Project? = nil
 
     var body: some View {
         NavigationSplitView {
             ThingsSidebar(
                 selection: $selection,
                 showAddArea: $showAddArea,
-                showAddProject: $showAddProject
+                showAddProject: $showAddProject,
+                onTap: { item in
+                    selection = item
+                    sidebarTapCount += 1
+                }
             )
+            .navigationSplitViewColumnWidth(min: 160, ideal: 175, max: 200)
         } detail: {
             Group {
                 switch selection {
                 case .today:
                     TodayView(timerManager: timerManager, showAddTask: .constant(nil))
+                case .upcoming:
+                    UpcomingView()
                 case .stats:
                     StatsView()
                 case .calendar:
@@ -95,8 +110,12 @@ struct MacContentView: View {
                     WishlistView()
                 case .project(let id):
                     if let project = projects.first(where: { $0.id == id }) {
-                        ProjectDetailView(project: project, timerManager: timerManager)
-                            .id(project.id)
+                        ProjectDetailView(
+                            project: project,
+                            timerManager: timerManager,
+                            onAddSubProject: project.parentProject == nil ? { showAddSubProject = project } : nil
+                        )
+                        .id(project.id)
                     }
                 case .area(let id):
                     if let area = areas.first(where: { $0.id == id }) {
@@ -106,17 +125,19 @@ struct MacContentView: View {
                     TodayView(timerManager: timerManager, showAddTask: .constant(nil))
                 }
             }
+            .id(sidebarTapCount)
         }
         .onAppear { timerManager.setup(context: modelContext) }
         .navigationSplitViewStyle(.balanced)
         .sheet(isPresented: $showAddArea) { AddAreaSheet() }
         .sheet(item: $showAddProject) { AddProjectSheet(area: $0) }
+        .sheet(item: $showAddSubProject) { AddProjectSheet(parentProject: $0) }
     }
 }
 
 // MARK: - Sidebar Item
 enum SidebarItem: Hashable {
-    case today, stats, calendar, studyPlan, spending, wishlist
+    case today, upcoming, stats, calendar, studyPlan, spending, wishlist
     case area(UUID)
     case project(UUID)
 }
@@ -124,99 +145,156 @@ enum SidebarItem: Hashable {
 // MARK: - Sidebar
 struct ThingsSidebar: View {
     @Query private var areas: [Area]
-    @Query(filter: #Predicate<Project> { $0.area == nil }) private var looseProjects: [Project]
+    @Query(filter: #Predicate<Project> { $0.area == nil && $0.parentProject == nil }) private var looseProjects: [Project]
     @Binding var selection: SidebarItem?
     @Binding var showAddArea: Bool
     @Binding var showAddProject: Area?
+    var onTap: ((SidebarItem) -> Void)? = nil
 
     var body: some View {
         List(selection: $selection) {
-            // 스마트 리스트
-            Section {
+            // LIFE
+            Section(content: {
                 Label("오늘", systemImage: "star.fill")
-                    .foregroundStyle(.primary)
+                    .font(.system(size: 12)).foregroundStyle(.primary).lineLimit(1)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                     .tag(SidebarItem.today)
-                Label("통계", systemImage: "chart.bar.fill")
-                    .foregroundStyle(.primary)
-                    .tag(SidebarItem.stats)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.today) })
+                Label("Upcoming", systemImage: "calendar.badge.clock")
+                    .font(.system(size: 12)).foregroundStyle(.primary).lineLimit(1)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
+                    .tag(SidebarItem.upcoming)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.upcoming) })
                 Label("캘린더", systemImage: "calendar")
-                    .foregroundStyle(.primary)
+                    .font(.system(size: 12)).foregroundStyle(.primary).lineLimit(1)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                     .tag(SidebarItem.calendar)
-                Label("학습 계획", systemImage: "books.vertical.fill")
-                    .foregroundStyle(.primary)
-                    .tag(SidebarItem.studyPlan)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.calendar) })
                 Label("가계부", systemImage: "wonsign.circle.fill")
-                    .foregroundStyle(.primary)
+                    .font(.system(size: 12)).foregroundStyle(.primary).lineLimit(1)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                     .tag(SidebarItem.spending)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.spending) })
                 Label("위시리스트", systemImage: "heart")
-                    .foregroundStyle(.primary)
+                    .font(.system(size: 12)).foregroundStyle(.primary).lineLimit(1)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                     .tag(SidebarItem.wishlist)
-            }
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.wishlist) })
+            }, header: {
+                Text("Life").font(.system(size: 10, weight: .semibold)).padding(.leading, 10)
+            })
+
+            // STUDY
+            Section(content: {
+                Label("통계", systemImage: "chart.bar.fill")
+                    .font(.system(size: 12)).foregroundStyle(.primary).lineLimit(1)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
+                    .tag(SidebarItem.stats)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.stats) })
+                Label("학습 계획", systemImage: "books.vertical.fill")
+                    .font(.system(size: 12)).foregroundStyle(.primary).lineLimit(1)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
+                    .tag(SidebarItem.studyPlan)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.studyPlan) })
+            }, header: {
+                Text("Study").font(.system(size: 10, weight: .semibold)).padding(.leading, 10)
+            })
 
             // Area별 프로젝트
             ForEach(areas.sorted { $0.order < $1.order }) { area in
-                Section {
+                Section(content: {
                     // Area 행
                     HStack(spacing: 8) {
                         Image(systemName: "tray.2")
-                            .font(.system(size: 13))
+                            .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                         Text(area.name)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(.primary)
                         Spacer()
                         Button {
                             showAddProject = area
                         } label: {
                             Image(systemName: "plus")
-                                .font(.system(size: 11))
+                                .font(.system(size: 10))
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
                     }
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                     .tag(SidebarItem.area(area.id))
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.area(area.id)) })
 
-                    // 하위 프로젝트
-                    ForEach(area.projects.sorted { $0.order < $1.order }) { project in
+                    // 하위 프로젝트 (최상위만)
+                    ForEach(area.projects.filter { $0.parentProject == nil }.sorted { $0.order < $1.order }) { project in
                         HStack(spacing: 8) {
                             Image(systemName: "folder.fill")
-                                .font(.system(size: 11))
+                                .font(.system(size: 10))
                                 .foregroundStyle(Color(hex: project.colorHex) ?? .blue)
                                 .padding(.leading, 8)
                             Text(project.name)
-                                .font(.system(size: 13))
+                                .font(.system(size: 12))
                                 .lineLimit(1)
                             Spacer()
                             let pending = project.pendingCount
                             if pending > 0 {
                                 Text("\(pending)")
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 11))
                                     .foregroundStyle(.secondary)
                             }
                         }
+                        .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                         .tag(SidebarItem.project(project.id))
+                        .simultaneousGesture(TapGesture().onEnded { onTap?(.project(project.id)) })
+
+                        // 서브 프로젝트 (한 계층 더)
+                        ForEach(project.subProjects.sorted { $0.order < $1.order }) { sub in
+                            HStack(spacing: 8) {
+                                Image(systemName: "folder.fill")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(Color(hex: sub.colorHex) ?? .blue)
+                                    .padding(.leading, 20)
+                                Text(sub.name)
+                                    .font(.system(size: 11))
+                                    .lineLimit(1)
+                                Spacer()
+                                let subPending = sub.pendingCount
+                                if subPending > 0 {
+                                    Text("\(subPending)")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .listRowInsets(EdgeInsets(top: 1, leading: 18, bottom: 1, trailing: 6))
+                            .tag(SidebarItem.project(sub.id))
+                            .simultaneousGesture(TapGesture().onEnded { onTap?(.project(sub.id)) })
+                        }
                     }
-                }
+                })
             }
 
             // Area 없는 프로젝트
             if !looseProjects.isEmpty {
-                Section("프로젝트") {
+                Section(content: {
                     ForEach(looseProjects) { project in
                         HStack(spacing: 8) {
                             Image(systemName: "folder.fill")
-                                .font(.system(size: 11))
+                                .font(.system(size: 10))
                                 .foregroundStyle(Color(hex: project.colorHex) ?? .blue)
-                            Text(project.name).font(.system(size: 13)).lineLimit(1)
+                            Text(project.name).font(.system(size: 12)).lineLimit(1)
                             Spacer()
                             let pending = project.pendingCount
                             if pending > 0 {
-                                Text("\(pending)").font(.system(size: 12)).foregroundStyle(.secondary)
+                                Text("\(pending)").font(.system(size: 11)).foregroundStyle(.secondary)
                             }
                         }
+                        .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                         .tag(SidebarItem.project(project.id))
+                        .simultaneousGesture(TapGesture().onEnded { onTap?(.project(project.id)) })
                     }
-                }
+                }, header: {
+                    Text("프로젝트").font(.system(size: 10, weight: .semibold)).padding(.leading, 10)
+                })
             }
         }
         .listStyle(.sidebar)
@@ -227,13 +305,13 @@ struct ThingsSidebar: View {
                     showAddArea = true
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "plus").font(.system(size: 12, weight: .medium))
-                        Text("새 Area").font(.system(size: 13))
+                        Image(systemName: "plus").font(.system(size: 11, weight: .medium))
+                        Text("새 Area").font(.system(size: 12))
                     }
                     .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .padding(.horizontal, 16)
+                .padding(.leading, 18).padding(.trailing, 8)
                 .padding(.vertical, 12)
                 Spacer()
             }
@@ -687,10 +765,15 @@ struct ProjectDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var project: Project
     var timerManager: TimerManager
+    var onAddSubProject: (() -> Void)? = nil
 
     @State private var newTaskTitle = ""
     @State private var isAddingTask = false
     @State private var selectedTask: Task? = nil
+    @State private var showAddNote = false
+    @State private var newNoteTitle = ""
+    @State private var newNoteType = "spreadsheet"
+    @State private var selectedNote: NoteDocument? = nil
 
     var pendingTasks: [Task] { project.tasks.filter { !$0.isCompleted } }
     var completedTasks: [Task] { project.tasks.filter { $0.isCompleted } }
@@ -704,11 +787,16 @@ struct ProjectDetailView: View {
                 // 프로젝트 헤더
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 10) {
-                        Image(systemName: "folder.fill")
+                        Image(systemName: project.parentProject != nil ? "folder.badge.plus" : "folder.fill")
                             .font(.system(size: 20))
                             .foregroundStyle(projColor)
                         Text(project.name)
-                            .font(.system(size: 26, weight: .bold))
+                            .font(.system(size: 24, weight: .bold))
+                        if let parent = project.parentProject {
+                            Text("in \(parent.name)")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
                     }
 
                     // Notes
@@ -716,7 +804,7 @@ struct ProjectDetailView: View {
                         get: { project.notes },
                         set: { project.notes = $0; try? modelContext.save() }
                     ), axis: .vertical)
-                    .font(.system(size: 14))
+                    .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .textFieldStyle(.plain)
                 }
@@ -724,6 +812,16 @@ struct ProjectDetailView: View {
                 .padding(.top, 28)
                 .padding(.bottom, 20)
 
+                Divider().padding(.horizontal, 32)
+
+                // 서브 프로젝트 섹션
+                if !project.subProjects.isEmpty || onAddSubProject != nil {
+                    SubProjectsSection(project: project, onAddSubProject: onAddSubProject)
+                    Divider().padding(.horizontal, 32)
+                }
+
+                // 필기노트 섹션
+                ProjectNotesSection(project: project)
                 Divider().padding(.horizontal, 32)
 
                 // 시험일 섹션 (학교 소속 프로젝트만)
@@ -749,21 +847,21 @@ struct ProjectDetailView: View {
                         HStack(spacing: 14) {
                             Circle()
                                 .strokeBorder(projColor, lineWidth: 1.5)
-                                .frame(width: 22, height: 22)
+                                .frame(width: 20, height: 20)
                             TextField("새 태스크", text: $newTaskTitle)
-                                .font(.system(size: 14))
+                                .font(.system(size: 13))
                                 .textFieldStyle(.plain)
                                 .onSubmit { submitNewTask() }
                             Spacer()
                             Button { isAddingTask = false } label: {
                                 Image(systemName: "xmark")
-                                    .font(.system(size: 11))
+                                    .font(.system(size: 10))
                                     .foregroundStyle(.secondary)
                             }
                             .buttonStyle(.plain)
                         }
                         .padding(.horizontal, 32)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, 9)
                     }
                 }
 
@@ -771,13 +869,13 @@ struct ProjectDetailView: View {
                 if !completedTasks.isEmpty {
                     HStack {
                         Text("완료됨")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.secondary)
                         Spacer()
                     }
                     .padding(.horizontal, 32)
-                    .padding(.top, 20)
-                    .padding(.bottom, 6)
+                    .padding(.top, 18)
+                    .padding(.bottom, 5)
 
                     ForEach(completedTasks) { task in
                         ThingsTaskRow(
@@ -839,6 +937,198 @@ struct ProjectDetailView: View {
     }
 }
 
+// MARK: - Sub Projects Section
+struct SubProjectsSection: View {
+    @Bindable var project: Project
+    var onAddSubProject: (() -> Void)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("서브 폴더")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if let onAdd = onAddSubProject {
+                    Button { onAdd() } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 32)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+
+            ForEach(project.subProjects.sorted { $0.order < $1.order }) { sub in
+                HStack(spacing: 10) {
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(hex: sub.colorHex) ?? .blue)
+                    Text(sub.name)
+                        .font(.system(size: 13))
+                    Spacer()
+                    if sub.pendingCount > 0 {
+                        Text("\(sub.pendingCount)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 32)
+                .padding(.vertical, 8)
+                .overlay(alignment: .bottom) { Divider().padding(.leading, 32) }
+            }
+
+            if project.subProjects.isEmpty {
+                Text("+ 버튼으로 서브 폴더를 추가하세요")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 10)
+            }
+        }
+    }
+}
+
+// MARK: - Project Notes Section
+struct ProjectNotesSection: View {
+    @Environment(\.modelContext) private var modelContext
+    @Bindable var project: Project
+    @State private var showAddNote = false
+    @State private var newNoteTitle = ""
+    @State private var newNoteType = "spreadsheet"
+    @State private var openNote: NoteDocument? = nil
+
+    var sortedNotes: [NoteDocument] {
+        project.noteDocuments.sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("필기노트")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button { showAddNote = true } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 32)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+
+            ForEach(sortedNotes) { note in
+                Button {
+                    openNote = note
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: note.type == "spreadsheet" ? "tablecells" : "circle.hexagongrid")
+                            .font(.system(size: 12))
+                            .foregroundStyle(note.type == "spreadsheet" ? Color.green : Color.purple)
+                            .frame(width: 20)
+                        Text(note.title)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Text(note.type == "spreadsheet" ? "표" : "맵")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 32)
+                .padding(.vertical, 8)
+                .overlay(alignment: .bottom) { Divider().padding(.leading, 32) }
+                .contextMenu {
+                    Button(role: .destructive) {
+                        project.noteDocuments.removeAll { $0.id == note.id }
+                        modelContext.delete(note)
+                        try? modelContext.save()
+                    } label: {
+                        Label("삭제", systemImage: "trash")
+                    }
+                }
+            }
+
+            if sortedNotes.isEmpty {
+                Text("+ 버튼으로 스프레드시트 또는 마인드맵을 추가하세요")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 10)
+            }
+        }
+        .sheet(isPresented: $showAddNote) {
+            NavigationStack {
+                Form {
+                    Section("제목") {
+                        TextField("노트 제목", text: $newNoteTitle)
+                    }
+                    Section("종류") {
+                        Picker("종류", selection: $newNoteType) {
+                            Label("스프레드시트", systemImage: "tablecells").tag("spreadsheet")
+                            Label("마인드맵", systemImage: "circle.hexagongrid").tag("mindmap")
+                        }
+                        .pickerStyle(.inline)
+                        .labelsHidden()
+                    }
+                }
+                .navigationTitle("새 필기노트")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("취소") { showAddNote = false; newNoteTitle = "" }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("추가") { addNote() }.disabled(newNoteTitle.isEmpty)
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+        }
+        .sheet(item: $openNote) { note in
+            NavigationStack {
+                Group {
+                    if note.type == "spreadsheet" {
+                        SpreadsheetEditorView(document: note)
+                    } else {
+                        MindMapEditorView(document: note)
+                    }
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("닫기") { openNote = nil }
+                    }
+                }
+            }
+        }
+    }
+
+    func addNote() {
+        let doc = NoteDocument(title: newNoteTitle, type: newNoteType)
+        doc.project = project
+        modelContext.insert(doc)
+        if newNoteType == "mindmap" {
+            let root = MindMapNode(text: newNoteTitle, x: 300, y: 300)
+            root.document = doc
+            doc.mapNodes.append(root)
+            modelContext.insert(root)
+        }
+        project.noteDocuments.append(doc)
+        try? modelContext.save()
+        showAddNote = false
+        newNoteTitle = ""
+    }
+}
+
 // MARK: - Things Task Row
 struct ThingsTaskRow: View {
     @Environment(\.modelContext) private var modelContext
@@ -847,6 +1137,8 @@ struct ThingsTaskRow: View {
     var timerManager: TimerManager
     var isSelected: Bool
     var onSelect: () -> Void
+    @State private var showEdit = false
+    @State private var showDeleteAlert = false
 
     var isRunning: Bool { timerManager.isRunning(task: task) }
     var projColor: Color { Color(hex: project.colorHex) ?? .blue }
@@ -879,7 +1171,7 @@ struct ThingsTaskRow: View {
                 // 제목 + 서브텍스트 — 클릭하면 펼치기
                 VStack(alignment: .leading, spacing: 3) {
                     Text(task.title)
-                        .font(.system(size: 15))
+                        .font(.system(size: 13))
                         .foregroundStyle(task.isCompleted ? Color.secondary : Color.primary)
                         .strikethrough(task.isCompleted, color: Color.secondary.opacity(0.5))
 
@@ -952,6 +1244,37 @@ struct ThingsTaskRow: View {
             }
 
             Divider().padding(.leading, 68)
+        }
+        .contextMenu {
+            Button {
+                showEdit = true
+            } label: {
+                Label("편집", systemImage: "pencil")
+            }
+            Button {
+                task.isCompleted.toggle()
+                if task.isCompleted && timerManager.isRunning(task: task) { timerManager.stop() }
+                try? modelContext.save()
+            } label: {
+                Label(task.isCompleted ? "미완료로 표시" : "완료로 표시",
+                      systemImage: task.isCompleted ? "circle" : "checkmark.circle")
+            }
+            Divider()
+            Button(role: .destructive) {
+                showDeleteAlert = true
+            } label: {
+                Label("삭제", systemImage: "trash")
+            }
+        }
+        .sheet(isPresented: $showEdit) {
+            TaskEditSheet(task: task)
+        }
+        .alert("태스크를 삭제할까요?", isPresented: $showDeleteAlert) {
+            Button("삭제", role: .destructive) {
+                modelContext.delete(task)
+                try? modelContext.save()
+            }
+            Button("취소", role: .cancel) {}
         }
     }
 

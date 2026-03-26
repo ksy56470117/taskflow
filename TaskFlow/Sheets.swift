@@ -84,6 +84,7 @@ struct AddProjectSheet: View {
     @FocusState private var focused: Bool
 
     var area: Area? = nil
+    var parentProject: Project? = nil
 
     @State private var name = ""
     @State private var selectedColor = "A8C8E8"
@@ -108,7 +109,7 @@ struct AddProjectSheet: View {
 
                 ZStack(alignment: .leading) {
                     if name.isEmpty {
-                        Text("새 프로젝트")
+                        Text(parentProject != nil ? "새 서브 폴더" : "새 프로젝트")
                             .font(.system(size: 14))
                             .foregroundStyle(Color.primary.opacity(0.28))
                     }
@@ -119,8 +120,16 @@ struct AddProjectSheet: View {
                         .onSubmit { submit() }
                 }
 
-                if let area = area {
-                    Spacer()
+                Spacer()
+                if let parent = parentProject {
+                    Text("in \(parent.name)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Color.secondary.opacity(0.1))
+                        .clipShape(Capsule())
+                } else if let area = area {
                     Text(area.name)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
@@ -195,11 +204,20 @@ struct AddProjectSheet: View {
 
     func submit() {
         guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        let project = Project(name: name, colorHex: selectedColor, area: area)
-        if let area = area {
-            area.projects.append(project)
+        if let parent = parentProject {
+            // 서브 폴더 생성
+            let sub = Project(name: name, colorHex: selectedColor, area: nil)
+            sub.parentProject = parent
+            parent.subProjects.append(sub)
+            modelContext.insert(sub)
+        } else {
+            // 일반 프로젝트 생성
+            let project = Project(name: name, colorHex: selectedColor, area: area)
+            if let area = area {
+                area.projects.append(project)
+            }
+            modelContext.insert(project)
         }
-        modelContext.insert(project)
         try? modelContext.save()
         dismiss()
     }

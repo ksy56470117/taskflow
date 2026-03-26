@@ -35,6 +35,13 @@ class Project {
     var midtermDate: Date?
     var finalDate: Date?
 
+    // 하위 폴더 계층
+    var parentProject: Project?
+    @Relationship(deleteRule: .cascade) var subProjects: [Project] = []
+
+    // 프로젝트에 연결된 노트 문서
+    @Relationship(deleteRule: .cascade, inverse: \NoteDocument.project) var noteDocuments: [NoteDocument] = []
+
     init(name: String, colorHex: String = "007AFF", area: Area? = nil, order: Int = 0) {
         self.id = UUID()
         self.name = name
@@ -64,6 +71,8 @@ class Task {
     var dueDate: Date?
     var project: Project?
     var timeEntries: [TimeEntry]
+    @Relationship(deleteRule: .nullify, inverse: \Tag.tasks)
+    var tags: [Tag] = []
 
     init(title: String, notes: String = "", project: Project? = nil, dueDate: Date? = nil) {
         self.id = UUID()
@@ -90,6 +99,23 @@ class Task {
     }
 }
 
+// MARK: - Tag
+@Model
+class Tag {
+    var id: UUID
+    var name: String
+    var colorHex: String
+    var createdAt: Date
+    var tasks: [Task] = []  // many-to-many 역관계
+
+    init(name: String, colorHex: String = "6366F1") {
+        self.id = UUID()
+        self.name = name
+        self.colorHex = colorHex
+        self.createdAt = Date()
+    }
+}
+
 // MARK: - TimeEntry
 @Model
 class TimeEntry {
@@ -111,6 +137,48 @@ class TimeEntry {
     }
 
     var isRunning: Bool { endedAt == nil }
+}
+
+// MARK: - ExamEvent (프로젝트 중간고사/기말고사 뷰 모델)
+struct ExamEvent: Identifiable {
+    let id: String          // project.id + type
+    let project: Project
+    let type: String        // "midterm" | "final"
+    var title: String { "\(project.name) \(type == "midterm" ? "중간고사" : "기말고사")" }
+    var icon: String  { type == "midterm" ? "doc.text.fill" : "checkmark.seal.fill" }
+    var colorHex: String { project.colorHex }
+    var date: Date { type == "midterm" ? project.midtermDate! : project.finalDate! }
+}
+
+extension [Project] {
+    func examEvents(on date: Date) -> [ExamEvent] {
+        let cal = Calendar.current
+        return flatMap { proj -> [ExamEvent] in
+            var ev: [ExamEvent] = []
+            if let d = proj.midtermDate, cal.isDate(d, inSameDayAs: date) {
+                ev.append(ExamEvent(id: proj.id.uuidString + "mid", project: proj, type: "midterm"))
+            }
+            if let d = proj.finalDate, cal.isDate(d, inSameDayAs: date) {
+                ev.append(ExamEvent(id: proj.id.uuidString + "fin", project: proj, type: "final"))
+            }
+            return ev
+        }
+    }
+    func upcomingExamEvents(from today: Date) -> [(Date, ExamEvent)] {
+        let start = Calendar.current.startOfDay(for: today)
+        return flatMap { proj -> [(Date, ExamEvent)] in
+            var ev: [(Date, ExamEvent)] = []
+            if let d = proj.midtermDate, Calendar.current.startOfDay(for: d) >= start {
+                ev.append((Calendar.current.startOfDay(for: d),
+                           ExamEvent(id: proj.id.uuidString + "mid", project: proj, type: "midterm")))
+            }
+            if let d = proj.finalDate, Calendar.current.startOfDay(for: d) >= start {
+                ev.append((Calendar.current.startOfDay(for: d),
+                           ExamEvent(id: proj.id.uuidString + "fin", project: proj, type: "final")))
+            }
+            return ev
+        }
+    }
 }
 
 // MARK: - SchoolEvent (주요 행사)
@@ -157,8 +225,10 @@ class Transaction {
     var memo: String
     var date: Date
     var isPlanned: Bool
+    var store: String = ""        // 구매처 (쿠팡, 배민 등)
+    var subcategory: String = ""  // 구독 서브카테고리 (토스프라임, 애플뮤직, Claude 등)
 
-    init(amount: Int, type: String, category: String, paymentMethod: String = "카드", memo: String = "", date: Date = Date(), isPlanned: Bool = false) {
+    init(amount: Int, type: String, category: String, paymentMethod: String = "카드", memo: String = "", date: Date = Date(), isPlanned: Bool = false, store: String = "", subcategory: String = "") {
         self.id = UUID()
         self.amount = amount
         self.type = type
@@ -167,6 +237,8 @@ class Transaction {
         self.memo = memo
         self.date = date
         self.isPlanned = isPlanned
+        self.store = store
+        self.subcategory = subcategory
     }
 
     var formattedAmount: String {
@@ -176,22 +248,46 @@ class Transaction {
         return (type == "income" ? "+" : "-") + str + "원"
     }
 
-    static let expenseCategories = ["식비", "교통", "쇼핑", "문화/여가", "의료", "통신", "주거", "교육", "기타"]
-    static let incomeCategories  = ["급여", "용돈", "부업", "기타"]
-    static let paymentMethods    = ["카드", "현금", "계좌이체"]
+    static let expenseCategories = [
+        "중고거래", "구독", "배송비", "의류", "뷰티", "생필품", "디지털", "소셜", "문화", "기타"
+    ]
+    static let incomeCategories  = ["구독", "용돈", "환불", "중고거래", "기타"]
+    static let paymentMethods    = ["카드", "현금", "계좌이체", "페이"]
+
+    // 구독 서브카테고리
+    static let subscriptionSubcategories = ["토스프라임", "애플뮤직", "Claude", "기타"]
+
+    // 구매처/플랫폼
+    static let stores = [
+        "쿠팡", "네이버쇼핑", "무신사", "쿠팡이츠", "배달의민족", "요기요",
+        "올리브영", "다이소", "이마트", "홈플러스", "마켓컬리", "지그재그",
+        "에이블리", "29CM", "SSG", "롯데온", "카카오", "직접입력"
+    ]
+    static let storeIcon: [String: String] = [
+        "쿠팡": "shippingbox", "네이버쇼핑": "magnifyingglass", "무신사": "tshirt",
+        "쿠팡이츠": "fork.knife.circle", "배달의민족": "bicycle", "요기요": "takeoutbag.and.cup.and.straw",
+        "올리브영": "sparkles", "다이소": "bag", "이마트": "cart", "홈플러스": "storefront",
+        "마켓컬리": "leaf", "지그재그": "tag", "에이블리": "hanger", "29CM": "bag.fill",
+        "SSG": "building.2", "롯데온": "building", "카카오": "bubble.left"
+    ]
 
     static let categoryIcon: [String: String] = [
-        "식비": "fork.knife", "교통": "car", "쇼핑": "bag",
-        "문화/여가": "ticket", "의료": "cross.case", "통신": "wifi",
-        "주거": "house", "교육": "graduationcap", "기타": "ellipsis.circle",
-        "급여": "banknote", "용돈": "gift", "부업": "briefcase"
+        // 지출
+        "중고거래": "arrow.2.squarepath", "구독": "arrow.clockwise.circle",
+        "배송비": "shippingbox", "의류": "tshirt", "뷰티": "sparkles",
+        "생필품": "cart", "디지털": "laptopcomputer", "소셜": "person.2",
+        "문화": "ticket", "기타": "ellipsis.circle",
+        // 수입
+        "용돈": "gift", "환불": "arrow.uturn.left"
     ]
 
     static let categoryColor: [String: String] = [
-        "식비": "FF6B6B", "교통": "4ECDC4", "쇼핑": "A78BFA",
-        "문화/여가": "F59E0B", "의료": "EF4444", "통신": "3B82F6",
-        "주거": "10B981", "교육": "6366F1", "기타": "9CA3AF",
-        "급여": "22C55E", "용돈": "84CC16", "부업": "F97316"
+        // 지출
+        "중고거래": "F97316", "구독": "6366F1", "배송비": "94A3B8",
+        "의류": "A78BFA", "뷰티": "F472B6", "생필품": "34D399",
+        "디지털": "3B82F6", "소셜": "EC4899", "문화": "F59E0B", "기타": "9CA3AF",
+        // 수입
+        "용돈": "84CC16", "환불": "10B981"
     ]
 }
 
@@ -331,6 +427,16 @@ class WishItem {
         "식품":    "fork.knife",
         "기타":    "tag"
     ]
+
+    static let categoryColor: [String: String] = [
+        "전자기기": "3B82F6",
+        "패션":    "A78BFA",
+        "도서":    "F59E0B",
+        "뷰티":    "F472B6",
+        "인테리어": "34D399",
+        "식품":    "FF6B6B",
+        "기타":    "9CA3AF"
+    ]
 }
 
 // MARK: - ScheduledTransaction (정기 거래)
@@ -414,4 +520,59 @@ class StudySession {
     }
 
     var label: String { "\(units)\(unitType)" }
+}
+
+// MARK: - NoteDocument (노트 문서)
+@Model
+class NoteDocument {
+    var id: UUID
+    var title: String
+    var type: String          // "spreadsheet" | "mindmap"
+    var createdAt: Date
+    var updatedAt: Date
+    @Relationship(deleteRule: .cascade) var cells: [SpreadsheetCell] = []
+    @Relationship(deleteRule: .cascade) var mapNodes: [MindMapNode] = []
+    var project: Project?     // 연결된 프로젝트 (nil이면 독립 노트)
+
+    init(title: String, type: String) {
+        self.id = UUID()
+        self.title = title
+        self.type = type
+        self.createdAt = Date()
+        self.updatedAt = Date()
+    }
+}
+
+// MARK: - SpreadsheetCell (스프레드시트 셀)
+@Model
+class SpreadsheetCell {
+    var row: Int
+    var col: Int
+    var content: String
+    var document: NoteDocument?
+
+    init(row: Int, col: Int, content: String = "") {
+        self.row = row
+        self.col = col
+        self.content = content
+    }
+}
+
+// MARK: - MindMapNode (마인드맵 노드)
+@Model
+class MindMapNode {
+    var id: UUID
+    var text: String
+    var x: Double
+    var y: Double
+    var parentNodeId: UUID?
+    var document: NoteDocument?
+
+    init(text: String, x: Double, y: Double, parentNodeId: UUID? = nil) {
+        self.id = UUID()
+        self.text = text
+        self.x = x
+        self.y = y
+        self.parentNodeId = parentNodeId
+    }
 }

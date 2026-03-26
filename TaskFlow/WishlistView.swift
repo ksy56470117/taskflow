@@ -116,7 +116,8 @@ struct WishlistView: View {
         }
         #endif
         .sheet(isPresented: $showAdd) {
-            AddWishItemSheet()
+            AddWishItemSheet(defaultCategory: selectedCategory ?? "기타")
+                .presentationDetents([.height(540)])
         }
         #if os(macOS)
         .safeAreaInset(edge: .bottom) {
@@ -270,26 +271,24 @@ struct WishItemRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // 구매 체크
-            Button {
-                withAnimation(.spring(duration: 0.2)) {
-                    item.isPurchased.toggle()
-                    try? modelContext.save()
-                }
-            } label: {
-                ZStack {
-                    Circle()
-                        .strokeBorder(item.isPurchased ? Color.green : Color.secondary.opacity(0.3), lineWidth: 1.5)
-                        .frame(width: 22, height: 22)
-                    if item.isPurchased {
-                        Circle().fill(Color.green).frame(width: 22, height: 22)
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
+            // 구매 체크 — macOS 히트 영역 명시
+            ZStack {
+                Circle()
+                    .strokeBorder(item.isPurchased ? Color.green : Color.secondary.opacity(0.35), lineWidth: 1.5)
+                    .frame(width: 22, height: 22)
+                if item.isPurchased {
+                    Circle().fill(Color.green).frame(width: 22, height: 22)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
                 }
             }
-            .buttonStyle(.plain)
+            .frame(width: 34, height: 34)
+            .contentShape(Circle())
+            .onTapGesture {
+                item.isPurchased.toggle()
+                try? modelContext.save()
+            }
 
             // 제품 정보
             VStack(alignment: .leading, spacing: 3) {
@@ -346,12 +345,14 @@ struct WishItemRow: View {
     }
 }
 
-// MARK: - 추가/편집 시트
+// MARK: - 추가/편집 시트 (가계부 스타일)
 struct AddWishItemSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var nameFocused: Bool
 
     var editItem: WishItem? = nil
+    var defaultCategory: String = "기타"
 
     @State private var name = ""
     @State private var category = "기타"
@@ -361,79 +362,209 @@ struct AddWishItemSheet: View {
     @State private var notes = ""
 
     var isEditing: Bool { editItem != nil }
+    var canSubmit: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty }
+    var catColor: Color { Color(hex: WishItem.categoryColor[category] ?? "9CA3AF") ?? .secondary }
+
+    var formattedPrice: String {
+        let n = Int(priceText.replacingOccurrences(of: ",", with: "")) ?? 0
+        let f = NumberFormatter(); f.numberStyle = .decimal
+        return "₩" + (f.string(from: NSNumber(value: n)) ?? "0")
+    }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("제품 정보") {
-                    TextField("제품명", text: $name)
+        ZStack {
+            Color(.windowBackgroundColor).ignoresSafeArea()
 
-                    Picker("카테고리", selection: $category) {
+            VStack(spacing: 0) {
+
+                // 헤더
+                HStack {
+                    ZStack {
+                        Circle()
+                            .fill(catColor.opacity(0.15))
+                            .frame(width: 34, height: 34)
+                        Image(systemName: WishItem.categoryIcon[category] ?? "tag")
+                            .font(.system(size: 14))
+                            .foregroundStyle(catColor)
+                    }
+                    Text(isEditing ? "항목 편집" : "새 항목 추가")
+                        .font(.system(size: 16, weight: .semibold))
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(Color.secondary.opacity(0.35))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+
+                // 제품명
+                VStack(alignment: .leading, spacing: 4) {
+                    TextField("제품명 입력", text: $name)
+                        .focused($nameFocused)
+                        .font(.system(size: 16))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                        .background(Color.secondary.opacity(0.07))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.secondary.opacity(0.2), lineWidth: 1))
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 10)
+
+                // 구분선
+                Divider()
+
+                // 카테고리
+                infoRow(label: "카테고리") {
+                    Menu {
                         ForEach(WishItem.categories, id: \.self) { cat in
-                            HStack {
-                                Image(systemName: WishItem.categoryIcon[cat] ?? "tag")
-                                Text(cat)
+                            Button { category = cat } label: {
+                                HStack {
+                                    Label(cat, systemImage: WishItem.categoryIcon[cat] ?? "tag")
+                                    if category == cat { Image(systemName: "checkmark") }
+                                }
                             }
-                            .tag(cat)
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Circle().fill(catColor).frame(width: 7, height: 7)
+                            Text(category)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.primary)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .background(Color.secondary.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.secondary.opacity(0.2), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Divider().padding(.horizontal, 16)
+
+                // 가격
+                infoRow(label: "가격") {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Text("₩").font(.system(size: 14)).foregroundStyle(.secondary)
+                            TextField("0", text: $priceText)
+                                .multilineTextAlignment(.trailing)
+                                .font(.system(size: 15, weight: .medium))
+                                .frame(width: 120)
+                                #if os(iOS)
+                                .keyboardType(.numberPad)
+                                #endif
+                        }
+                        if !priceText.isEmpty, (Int(priceText.replacingOccurrences(of: ",", with: "")) ?? 0) > 0 {
+                            Text(formattedPrice)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.blue)
                         }
                     }
                 }
 
-                Section("구매 정보") {
-                    HStack {
-                        Image(systemName: "storefront").foregroundStyle(.secondary)
-                        TextField("판매처 (예: 쿠팡, 무신사)", text: $store)
-                    }
+                Divider().padding(.horizontal, 16)
 
-                    HStack {
-                        Image(systemName: "wonsign").foregroundStyle(.secondary)
-                        TextField("가격", text: $priceText)
-                            #if os(iOS)
-                            .keyboardType(.numberPad)
-                            #endif
-                    }
-
-                    HStack {
-                        Image(systemName: "link").foregroundStyle(.secondary)
-                        TextField("링크 (선택)", text: $url)
-                            #if os(iOS)
-                            .keyboardType(.URL)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                            #endif
-                    }
+                // 판매처
+                infoRow(label: "판매처") {
+                    TextField("쿠팡, 무신사…", text: $store)
+                        .multilineTextAlignment(.trailing)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.primary)
                 }
 
-                Section("메모") {
-                    TextField("메모 (선택)", text: $notes, axis: .vertical)
-                        .lineLimit(3...6)
+                Divider().padding(.horizontal, 16)
+
+                // 링크
+                infoRow(label: "링크") {
+                    TextField("https://", text: $url)
+                        .multilineTextAlignment(.trailing)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.primary)
+                        #if os(iOS)
+                        .keyboardType(.URL)
+                        .autocorrectionDisabled()
+                        #endif
                 }
-            }
-            .navigationTitle(isEditing ? "편집" : "새 항목")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("취소") { dismiss() }
+
+                Divider().padding(.horizontal, 16)
+
+                // 메모
+                infoRow(label: "메모") {
+                    TextField("선택 입력", text: $notes)
+                        .multilineTextAlignment(.trailing)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.primary)
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(isEditing ? "저장" : "추가") { submit() }
-                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+
+                Divider()
+
+                Spacer()
+
+                // 버튼
+                HStack(spacing: 10) {
+                    Button { dismiss() } label: {
+                        Text("취소")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 13)
+                            .background(Color.secondary.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button { submit() } label: {
+                        Text(isEditing ? "저장" : "추가")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(canSubmit ? .white : .secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 13)
+                            .background(canSubmit ? Color.blue : Color.secondary.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canSubmit)
                 }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
             }
         }
-        .onAppear { loadEditItem() }
+        .onAppear {
+            if let item = editItem {
+                name = item.name
+                category = item.category
+                store = item.store
+                priceText = item.price > 0 ? "\(item.price)" : ""
+                url = item.url
+                notes = item.notes
+            } else {
+                category = defaultCategory
+            }
+            nameFocused = true
+        }
     }
 
-    func loadEditItem() {
-        guard let item = editItem else { return }
-        name = item.name
-        category = item.category
-        store = item.store
-        priceText = item.price > 0 ? "\(item.price)" : ""
-        url = item.url
-        notes = item.notes
+    @ViewBuilder
+    func infoRow<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+            Spacer()
+            content()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 
     func submit() {
