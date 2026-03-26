@@ -532,6 +532,7 @@ class NoteDocument {
     var updatedAt: Date
     @Relationship(deleteRule: .cascade) var cells: [SpreadsheetCell] = []
     @Relationship(deleteRule: .cascade) var mapNodes: [MindMapNode] = []
+    var project: Project?     // 연결된 프로젝트 (nil이면 독립 노트)
 
     init(title: String, type: String) {
         self.id = UUID()
