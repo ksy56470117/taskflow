@@ -219,8 +219,8 @@ struct ThingsSidebar: View {
                     .tag(SidebarItem.area(area.id))
                     .simultaneousGesture(TapGesture().onEnded { onTap?(.area(area.id)) })
 
-                    // 하위 프로젝트 (최상위만)
-                    ForEach(area.projects.filter { $0.parentProject == nil }.sorted { $0.order < $1.order }) { project in
+                    // 하위 프로젝트
+                    ForEach(area.projects.sorted { $0.order < $1.order }) { project in
                         HStack(spacing: 8) {
                             Image(systemName: "folder.fill")
                                 .font(.system(size: 10))
@@ -240,29 +240,6 @@ struct ThingsSidebar: View {
                         .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                         .tag(SidebarItem.project(project.id))
                         .simultaneousGesture(TapGesture().onEnded { onTap?(.project(project.id)) })
-
-                        // 서브 프로젝트 (한 계층 더)
-                        ForEach(project.subProjects.sorted { $0.order < $1.order }) { sub in
-                            HStack(spacing: 8) {
-                                Image(systemName: "folder.fill")
-                                    .font(.system(size: 9))
-                                    .foregroundStyle(Color(hex: sub.colorHex) ?? .blue)
-                                    .padding(.leading, 20)
-                                Text(sub.name)
-                                    .font(.system(size: 11))
-                                    .lineLimit(1)
-                                Spacer()
-                                let subPending = sub.pendingCount
-                                if subPending > 0 {
-                                    Text("\(subPending)")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .listRowInsets(EdgeInsets(top: 1, leading: 18, bottom: 1, trailing: 6))
-                            .tag(SidebarItem.project(sub.id))
-                            .simultaneousGesture(TapGesture().onEnded { onTap?(.project(sub.id)) })
-                        }
                     }
                 })
             }
