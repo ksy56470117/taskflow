@@ -204,11 +204,20 @@ struct AddProjectSheet: View {
 
     func submit() {
         guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        let project = Project(name: name, colorHex: selectedColor, area: area)
-        if let area = area {
-            area.projects.append(project)
+        if let parent = parentProject {
+            // 서브 폴더 생성
+            let sub = Project(name: name, colorHex: selectedColor, area: nil)
+            sub.parentProject = parent
+            parent.subProjects.append(sub)
+            modelContext.insert(sub)
+        } else {
+            // 일반 프로젝트 생성
+            let project = Project(name: name, colorHex: selectedColor, area: area)
+            if let area = area {
+                area.projects.append(project)
+            }
+            modelContext.insert(project)
         }
-        modelContext.insert(project)
         try? modelContext.save()
         dismiss()
     }
