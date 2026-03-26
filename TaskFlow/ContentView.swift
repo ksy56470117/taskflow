@@ -299,8 +299,8 @@ struct ThingsSidebar: View {
                     showAddArea = true
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "plus").font(.system(size: 12, weight: .medium))
-                        Text("새 Area").font(.system(size: 13))
+                        Image(systemName: "plus").font(.system(size: 11, weight: .medium))
+                        Text("새 Area").font(.system(size: 12))
                     }
                     .foregroundStyle(.secondary)
                 }
