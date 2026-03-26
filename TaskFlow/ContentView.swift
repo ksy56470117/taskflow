@@ -139,7 +139,7 @@ enum SidebarItem: Hashable {
 // MARK: - Sidebar
 struct ThingsSidebar: View {
     @Query private var areas: [Area]
-    @Query(filter: #Predicate<Project> { $0.area == nil }) private var looseProjects: [Project]
+    @Query(filter: #Predicate<Project> { $0.area == nil && $0.parentProject == nil }) private var looseProjects: [Project]
     @Binding var selection: SidebarItem?
     @Binding var showAddArea: Bool
     @Binding var showAddProject: Area?
