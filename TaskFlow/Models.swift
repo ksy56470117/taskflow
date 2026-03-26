@@ -560,16 +560,17 @@ class NoteDocument {
     }
 }
 
-// MARK: - NoteBlock (노트 블록 - 텍스트/이미지/텍스트박스)
+// MARK: - NoteBlock (노트 블록 - 텍스트/이미지/텍스트박스/마인드맵)
 @Model
 class NoteBlock {
     var id: UUID
     var order: Int
-    var blockType: String   // "text" | "image" | "textbox"
+    var blockType: String   // "text" | "image" | "textbox" | "mindmap"
     var content: String
     var indentLevel: Int    // 0~3 사이클 (1. → 1) → (1) → ①)
     var imageData: Data?
     var document: NoteDocument?
+    @Relationship(deleteRule: .cascade, inverse: \MindMapNode.noteBlock) var mindMapNodes: [MindMapNode] = []
 
     init(order: Int, blockType: String = "text", content: String = "", indentLevel: Int = 0) {
         self.id = UUID()
