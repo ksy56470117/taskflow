@@ -117,6 +117,11 @@ struct NoteEditorView: View {
                         .font(.system(size: 18))
                         .foregroundStyle(.secondary)
                 }
+                Button { showPDFImporter = true } label: {
+                    Image(systemName: "doc.richtext")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 if let fid = focusedId,
                    let block = document.blocks.first(where: { $0.id == fid }),
