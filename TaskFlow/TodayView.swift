@@ -138,6 +138,67 @@ struct TodayView: View {
                     .padding(.bottom, 16)
                 }
 
+                // MARK: - 스테이징된 시간 기록 (커밋 대기)
+                if !stagedEntries.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "clock.badge.questionmark")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.orange)
+                            Text("커밋 대기 (\(stagedEntries.count))")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.orange)
+                            Spacer()
+                            Button {
+                                for entry in stagedEntries { entry.isCommitted = true }
+                                try? modelContext.save()
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 12))
+                                    Text("모두 커밋")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundStyle(.green)
+                            }
+                            .buttonStyle(.plain)
+
+                            Button { showManualEntry = true } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 12))
+                                    Text("직접 추가")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundStyle(.blue)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        ForEach(stagedEntries) { entry in
+                            StagedEntryRow(entry: entry)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 16)
+                } else {
+                    HStack {
+                        Spacer()
+                        Button { showManualEntry = true } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "clock.badge.plus")
+                                    .font(.system(size: 12))
+                                Text("시간 직접 추가")
+                                    .font(.system(size: 12, weight: .medium))
+                            }
+                            .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 8)
+                }
+
                 // MARK: - 오늘 시험
                 if !todayExams.isEmpty {
                     VStack(alignment: .leading, spacing: 0) {
