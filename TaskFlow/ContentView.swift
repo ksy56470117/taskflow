@@ -161,12 +161,17 @@ enum SidebarItem: Hashable {
 
 // MARK: - Sidebar
 struct ThingsSidebar: View {
+    @Environment(\.modelContext) private var modelContext
     @Query private var areas: [Area]
     @Query(filter: #Predicate<Project> { $0.area == nil }) private var looseProjects: [Project]
     @Binding var selection: SidebarItem?
     @Binding var showAddArea: Bool
     @Binding var showAddProject: Area?
     var onTap: ((SidebarItem) -> Void)? = nil
+    @State private var editingArea: Area? = nil
+    @State private var editingProject: Project? = nil
+    @State private var editName: String = ""
+    @State private var editColorHex: String = "007AFF"
 
     var body: some View {
         List(selection: $selection) {
