@@ -34,6 +34,39 @@ struct TaskFlowApp: App {
             UserDefaults.standard.set(true, forKey: "didSeedSchoolArea")
         }
 
+        // 시간표 시드
+        if !UserDefaults.standard.bool(forKey: "didSeedScheduleV2") {
+            let ctx = ModelContext(container)
+            // (제목, 요일(월0~일6), 시작시, 시작분, 종료시, 종료분, 색상hex, 장소)
+            let data: [(String, Int, Int, Int, Int, Int, String, String)] = [
+                // ── 월요일 ──
+                ("Network Security",        0,  9, 0, 11, 0, "3B82F6", "공학b151"),
+                ("신화·상상력·문화",           0, 11, 0, 12, 0, "22C55E", "캠b146"),
+                // ── 화요일 ──
+                ("국가안보론",                1, 11, 0, 12, 0, "8B5CF6", "학754"),
+                ("북한학",                   1, 12, 0, 14, 0, "F97316", "학754"),
+                ("4차산업혁명과창의적인재",     1, 14, 0, 15, 0, "06B6D4", "학109"),
+                ("SW리더십과기업가정신",       1, 17, 0, 18, 0, "EC4899", "공학b153"),
+                // ── 목요일 ──
+                ("Network Security",        3, 11, 0, 12, 0, "3B82F6", "공학b151"),
+                ("신화·상상력·문화",           3, 12, 0, 14, 0, "22C55E", "캠b146"),
+                // ── 금요일 ──
+                ("국가안보론",                4, 11, 0, 12, 0, "8B5CF6", "학754"),
+                ("북한학",                   4, 14, 0, 15, 0, "F97316", "학754"),
+                ("4차산업혁명과창의적인재",     4, 15, 0, 17, 0, "06B6D4", "학109"),
+            ]
+            for d in data {
+                ctx.insert(WeeklySchedule(
+                    title: d.0, dayOfWeek: d.1,
+                    startHour: d.2, startMinute: d.3,
+                    endHour: d.4, endMinute: d.5,
+                    colorHex: d.6, location: d.7
+                ))
+            }
+            try? ctx.save()
+            UserDefaults.standard.set(true, forKey: "didSeedScheduleV2")
+        }
+
     }
 
     static func resolveStoreURL() -> URL {
