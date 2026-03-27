@@ -21,58 +21,100 @@ struct NoteEditorView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                // 제목
-                TextField("제목 없음", text: Binding(
-                    get: { document.title },
-                    set: { document.title = $0; document.updatedAt = Date() }
-                ))
-                .font(.system(size: 20, weight: .bold))
-                .textFieldStyle(.plain)
-                .padding(.horizontal, 40)
-                .padding(.top, 28)
-                .padding(.bottom, 4)
-
-                Text(formatDate(document.updatedAt))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // 제목
+                    TextField("제목 없음", text: Binding(
+                        get: { document.title },
+                        set: { document.title = $0; document.updatedAt = Date() }
+                    ))
+                    .font(.system(size: 20, weight: .bold))
+                    .textFieldStyle(.plain)
                     .padding(.horizontal, 40)
-                    .padding(.bottom, 14)
+                    .padding(.top, 28)
+                    .padding(.bottom, 4)
 
-                Divider().padding(.horizontal, 40).padding(.bottom, 6)
+                    Text(formatDate(document.updatedAt))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 40)
+                        .padding(.bottom, 14)
 
-                // 블록들
-                ForEach(Array(sortedBlocks.enumerated()), id: \.element.id) { idx, block in
-                    NoteBlockRow(
-                        block: block,
-                        allBlocks: sortedBlocks,
-                        focusedId: $focusedId,
-                        onReturn: {
-                            let nb = insertBlock(after: block, type: "text", inheritIndent: true)
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focusedId = nb.id }
-                        },
-                        onIndent: { indentBlock(block) },
-                        onDedent: { dedentBlock(block) },
-                        onDeleteEmpty: {
-                            let prevId = idx > 0 ? sortedBlocks[idx - 1].id : nil
-                            deleteBlock(block)
-                            if let pid = prevId {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focusedId = pid }
+                    Divider().padding(.horizontal, 40).padding(.bottom, 6)
+
+                    // 블록들
+                    ForEach(Array(sortedBlocks.enumerated()), id: \.element.id) { idx, block in
+                        NoteBlockRow(
+                            block: block,
+                            allBlocks: sortedBlocks,
+                            focusedId: $focusedId,
+                            onReturn: {
+                                let nb = insertBlock(after: block, type: "text", inheritIndent: true)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focusedId = nb.id }
+                            },
+                            onIndent: { indentBlock(block) },
+                            onDedent: { dedentBlock(block) },
+                            onDeleteEmpty: {
+                                let prevId = idx > 0 ? sortedBlocks[idx - 1].id : nil
+                                deleteBlock(block)
+                                if let pid = prevId {
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focusedId = pid }
+                                }
                             }
-                        }
-                    )
-                }
-
-                // 빈 영역 탭 → 새 블록
-                Color.clear
-                    .frame(maxWidth: .infinity).frame(height: 120)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        let nb = insertBlock(after: sortedBlocks.last, type: "text", inheritIndent: false)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focusedId = nb.id }
+                        )
                     }
+
+                    // 빈 영역 탭 → 새 블록
+                    Color.clear
+                        .frame(maxWidth: .infinity).frame(height: 120)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            let nb = insertBlock(after: sortedBlocks.last, type: "text", inheritIndent: false)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focusedId = nb.id }
+                        }
+                }
             }
+
+            // iOS 하단 삽입 툴바
+            #if os(iOS)
+            Divider()
+            HStack(spacing: 20) {
+                Button { insertTextBox() } label: {
+                    Image(systemName: "text.viewfinder")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.secondary)
+                }
+                Button { showImageImporter = true } label: {
+                    Image(systemName: "photo.badge.plus")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.secondary)
+                }
+                Button { insertMindMap() } label: {
+                    Image(systemName: "circle.hexagongrid")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if let fid = focusedId,
+                   let block = document.blocks.first(where: { $0.id == fid }),
+                   block.blockType == "text" {
+                    Button { dedentBlock(block) } label: {
+                        Image(systemName: "decrease.indent")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.secondary)
+                    }
+                    Button { indentBlock(block) } label: {
+                        Image(systemName: "increase.indent")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.bar)
+            #endif
         }
         .navigationTitle("")
         #if os(macOS)
@@ -209,7 +251,7 @@ struct NoteBlockRow: View {
 
     var body: some View {
         switch block.blockType {
-        case "image":   imageView
+        case "image":   ResizableImageBlock(block: block, onDelete: onDeleteEmpty)
         case "textbox": textBoxView
         case "mindmap": InlineMindMapBlock(block: block)
         default:        textView
@@ -282,37 +324,6 @@ struct NoteBlockRow: View {
         #endif
     }
 
-    // MARK: 이미지 블록
-    @ViewBuilder
-    var imageView: some View {
-        #if os(macOS)
-        if let data = block.imageData, let nsImg = NSImage(data: data) {
-            Image(nsImage: nsImg)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(maxWidth: 500)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .padding(.horizontal, 40)
-                .padding(.vertical, 6)
-                .contextMenu {
-                    Button(role: .destructive) { onDeleteEmpty() } label: {
-                        Label("이미지 삭제", systemImage: "trash")
-                    }
-                }
-        }
-        #else
-        if let data = block.imageData, let uiImg = UIImage(data: data) {
-            Image(uiImage: uiImg)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(maxWidth: 400)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .padding(.horizontal, 40)
-                .padding(.vertical, 6)
-        }
-        #endif
-    }
-
     // MARK: 개요 번호
     func outlinePrefix() -> String {
         guard let idx = allBlocks.firstIndex(where: { $0.id == block.id }) else { return "" }
@@ -334,6 +345,110 @@ struct NoteBlockRow: View {
             return count <= 20 ? c[count - 1] : "(\(count))"
         default: return "\(count)."
         }
+    }
+}
+
+// MARK: - Resizable Image Block (사이즈 조정 가능)
+
+struct ResizableImageBlock: View {
+    @Environment(\.modelContext) private var modelContext
+    @Bindable var block: NoteBlock
+    var onDelete: () -> Void
+
+    @State private var currentWidth: CGFloat = 0
+    @State private var isDragging = false
+
+    private let minWidth: CGFloat = 80
+    private let maxWidth: CGFloat = 600
+
+    var body: some View {
+        GeometryReader { geo in
+            let containerWidth = geo.size.width - 80 // 양쪽 패딩 40씩
+            let displayWidth = block.imageWidth > 0
+                ? min(CGFloat(block.imageWidth), containerWidth)
+                : min(containerWidth, 400)
+
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                ZStack(alignment: .bottomTrailing) {
+                    imageContent(width: isDragging ? currentWidth : displayWidth)
+
+                    // 리사이즈 핸들
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 24, height: 24)
+                        .background(Circle().fill(Color.blue.opacity(0.8)))
+                        .offset(x: -6, y: -6)
+                        .gesture(
+                            DragGesture(minimumDistance: 2)
+                                .onChanged { val in
+                                    if !isDragging {
+                                        isDragging = true
+                                        currentWidth = displayWidth
+                                    }
+                                    let newW = currentWidth + val.translation.width
+                                    currentWidth = min(max(newW, minWidth), min(maxWidth, containerWidth))
+                                }
+                                .onEnded { _ in
+                                    block.imageWidth = Double(currentWidth)
+                                    isDragging = false
+                                    try? modelContext.save()
+                                }
+                        )
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(width: geo.size.width)
+        }
+        .frame(height: calculatedHeight)
+        .padding(.vertical, 6)
+        .contextMenu {
+            Button { block.imageWidth = 0; try? modelContext.save() } label: {
+                Label("원래 크기로", systemImage: "arrow.uturn.backward")
+            }
+            Button(role: .destructive) { onDelete() } label: {
+                Label("이미지 삭제", systemImage: "trash")
+            }
+        }
+    }
+
+    @ViewBuilder
+    func imageContent(width: CGFloat) -> some View {
+        #if os(macOS)
+        if let data = block.imageData, let nsImg = NSImage(data: data) {
+            let aspect = nsImg.size.height / max(nsImg.size.width, 1)
+            Image(nsImage: nsImg)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: width)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        #else
+        if let data = block.imageData, let uiImg = UIImage(data: data) {
+            Image(uiImage: uiImg)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: width)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        #endif
+    }
+
+    var calculatedHeight: CGFloat {
+        let baseWidth: CGFloat = block.imageWidth > 0 ? CGFloat(block.imageWidth) : 400
+        #if os(macOS)
+        if let data = block.imageData, let nsImg = NSImage(data: data) {
+            let aspect = nsImg.size.height / max(nsImg.size.width, 1)
+            return (isDragging ? currentWidth : baseWidth) * aspect
+        }
+        #else
+        if let data = block.imageData, let uiImg = UIImage(data: data) {
+            let aspect = uiImg.size.height / max(uiImg.size.width, 1)
+            return (isDragging ? currentWidth : baseWidth) * aspect
+        }
+        #endif
+        return 200
     }
 }
 
