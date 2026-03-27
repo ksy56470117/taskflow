@@ -12,10 +12,25 @@ enum NoteEditorColors {
     #endif
 }
 
-// MARK: - Postit color palette
+// MARK: - Color palettes
 let postitColorPalette: [(name: String, hex: String)] = [
     ("노랑", "FEF3C7"), ("분홍", "FCE7F3"), ("연두", "D1FAE5"),
     ("하늘", "DBEAFE"), ("보라", "EDE9FE"), ("주황", "FFEDD5")
+]
+
+let textColorPalette: [(name: String, hex: String)] = [
+    ("기본", ""), ("빨강", "EF4444"), ("주황", "F97316"), ("노랑", "EAB308"),
+    ("초록", "22C55E"), ("파랑", "3B82F6"), ("보라", "8B5CF6"), ("회색", "6B7280")
+]
+
+let highlightPalette: [(name: String, hex: String)] = [
+    ("없음", ""), ("노랑", "FEF08A"), ("초록", "BBF7D0"), ("파랑", "BFDBFE"),
+    ("분홍", "FBCFE8"), ("보라", "DDD6FE"), ("주황", "FED7AA")
+]
+
+let nodeColorPalette: [(name: String, hex: String)] = [
+    ("기본", ""), ("빨강", "FCA5A5"), ("주황", "FDBA74"), ("노랑", "FDE047"),
+    ("초록", "86EFAC"), ("파랑", "93C5FD"), ("보라", "C4B5FD"), ("분홍", "F9A8D4")
 ]
 
 // MARK: - Note Editor
