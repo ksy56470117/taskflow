@@ -437,6 +437,51 @@ struct NoteBlockRow: View {
     }
 }
 
+// MARK: - Draggable Block Wrapper (자유 이동 공통 래퍼)
+
+struct DraggableBlockWrapper<Content: View>: View {
+    @Environment(\.modelContext) private var modelContext
+    @Bindable var block: NoteBlock
+    @ViewBuilder var content: Content
+
+    @State private var dragOffset: CGSize = .zero
+    @State private var isMoving = false
+
+    var body: some View {
+        let savedX = CGFloat(block.imageOffsetX)
+        let savedY = CGFloat(block.imageOffsetY)
+        let totalX = savedX + (isMoving ? dragOffset.width : 0)
+        let totalY = savedY + (isMoving ? dragOffset.height : 0)
+
+        content
+            .offset(x: totalX, y: totalY)
+            .gesture(
+                DragGesture(minimumDistance: 10)
+                    .onChanged { val in
+                        isMoving = true
+                        dragOffset = val.translation
+                    }
+                    .onEnded { val in
+                        block.imageOffsetX = Double(savedX + val.translation.width)
+                        block.imageOffsetY = Double(savedY + val.translation.height)
+                        dragOffset = .zero
+                        isMoving = false
+                        try? modelContext.save()
+                    }
+            )
+            .contextMenu {
+                if block.imageOffsetX != 0 || block.imageOffsetY != 0 {
+                    Button {
+                        block.imageOffsetX = 0; block.imageOffsetY = 0
+                        try? modelContext.save()
+                    } label: {
+                        Label("원래 위치로", systemImage: "arrow.uturn.backward.circle")
+                    }
+                }
+            }
+    }
+}
+
 // MARK: - Postit Block (포스트잇 - 자유 이동 가능)
 
 struct PostitBlock: View {
