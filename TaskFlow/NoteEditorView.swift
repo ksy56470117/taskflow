@@ -1046,15 +1046,25 @@ struct InlineMindMapNodeView: View {
 
     @GestureState private var dragDelta: CGSize = .zero
 
+    private var nodeFill: Color {
+        if !node.colorHex.isEmpty, let c = Color(hex: node.colorHex) { return c }
+        return isRoot ? Color.blue : Color(NoteEditorColors.background)
+    }
+
+    private var textStyle: Color {
+        if !node.colorHex.isEmpty { return .primary }
+        return isRoot ? .white : .primary
+    }
+
     var body: some View {
         Text(node.text)
             .font(.system(size: isRoot ? 14 : 12, weight: isRoot ? .bold : .medium))
-            .foregroundStyle(isRoot ? .white : .primary)
+            .foregroundStyle(textStyle)
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(isRoot ? Color.blue : Color(NoteEditorColors.background))
+                    .fill(nodeFill)
                     .shadow(color: isSelected ? .blue.opacity(0.4) : .black.opacity(0.1),
                             radius: isSelected ? 6 : 3, x: 0, y: 1)
             )
