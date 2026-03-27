@@ -50,25 +50,9 @@ struct WeeklyScheduleView: View {
         }
     }
 
-    // 표시 시간 범위
-    private var minHour: Int {
-        if tab == 0 {
-            let earliest = schedules.map(\.startHour).min() ?? 9
-            return max(earliest - 1, 0)
-        } else {
-            let earliest = weekTimeBlocks.map { $0.startMinute / 60 }.min() ?? 9
-            return max(earliest - 1, 0)
-        }
-    }
-    private var maxHour: Int {
-        if tab == 0 {
-            let latest = schedules.map(\.endHour).max() ?? 18
-            return min(latest + 1, 24)
-        } else {
-            let latest = weekTimeBlocks.map { ($0.endMinute + 59) / 60 }.max() ?? 18
-            return min(latest + 1, 24)
-        }
-    }
+    // 0~24 전체 시간
+    private let minHour = 0
+    private let maxHour = 24
     private var displayHours: [Int] { Array(minHour...maxHour) }
 
     private let hourHeight: CGFloat = 60
