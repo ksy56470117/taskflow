@@ -67,18 +67,20 @@ class Task {
     var isCompleted: Bool
     var createdAt: Date
     var dueDate: Date?
+    var recurrence: String = ""  // "" = 없음, "daily" = 매일, "weekly" = 매주
     var project: Project?
     var timeEntries: [TimeEntry]
     @Relationship(deleteRule: .nullify, inverse: \Tag.tasks)
     var tags: [Tag] = []
 
-    init(title: String, notes: String = "", project: Project? = nil, dueDate: Date? = nil) {
+    init(title: String, notes: String = "", project: Project? = nil, dueDate: Date? = nil, recurrence: String = "") {
         self.id = UUID()
         self.title = title
         self.notes = notes
         self.isCompleted = false
         self.createdAt = Date()
         self.dueDate = dueDate
+        self.recurrence = recurrence
         self.project = project
         self.timeEntries = []
     }
