@@ -717,6 +717,18 @@ struct TaskRow: View {
     func isPast(_ d: Date) -> Bool {
         d < Calendar.current.startOfDay(for: Date())
     }
+
+    func spawnNextRecurrence() {
+        let cal = Calendar.current
+        let interval: Calendar.Component = task.recurrence == "daily" ? .day : .weekOfYear
+        let base = task.dueDate ?? Date()
+        let nextDue = cal.date(byAdding: interval, value: 1, to: base)!
+
+        let next = Task(title: task.title, notes: task.notes, project: task.project, dueDate: nextDue, recurrence: task.recurrence)
+        next.tags = task.tags
+        task.project?.tasks.append(next)
+        modelContext.insert(next)
+    }
 }
 
 // MARK: - 날짜 선택 Pill
