@@ -11,6 +11,12 @@ enum NoteEditorColors {
     #endif
 }
 
+// MARK: - Postit color palette
+let postitColorPalette: [(name: String, hex: String)] = [
+    ("노랑", "FEF3C7"), ("분홍", "FCE7F3"), ("연두", "D1FAE5"),
+    ("하늘", "DBEAFE"), ("보라", "EDE9FE"), ("주황", "FFEDD5")
+]
+
 // MARK: - Note Editor
 
 struct NoteEditorView: View {
@@ -104,6 +110,11 @@ struct NoteEditorView: View {
                         .font(.system(size: 18))
                         .foregroundStyle(.secondary)
                 }
+                Button { insertPostit() } label: {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 if let fid = focusedId,
                    let block = document.blocks.first(where: { $0.id == fid }),
@@ -150,6 +161,9 @@ struct NoteEditorView: View {
 
                 Button { insertMindMap() } label: { Label("마인드맵", systemImage: "circle.hexagongrid") }
                     .help("마인드맵 삽입")
+
+                Button { insertPostit() } label: { Label("포스트잇", systemImage: "note.text") }
+                    .help("포스트잇 삽입")
             }
         }
         #endif
@@ -211,11 +225,16 @@ struct NoteEditorView: View {
 
     func insertMindMap() {
         let b = insertBlock(after: anchorBlock, type: "mindmap", inheritIndent: false)
-        // 루트 노드 자동 생성
         let root = MindMapNode(text: "주제", x: 200, y: 120)
         root.noteBlock = b
         b.mindMapNodes.append(root)
         modelContext.insert(root)
+        try? modelContext.save()
+    }
+
+    func insertPostit() {
+        let b = insertBlock(after: anchorBlock, type: "postit", inheritIndent: false)
+        b.content = "메모"
         try? modelContext.save()
     }
 
@@ -263,6 +282,7 @@ struct NoteBlockRow: View {
         case "image":   ResizableImageBlock(block: block, onDelete: onDeleteEmpty)
         case "textbox": textBoxView
         case "mindmap": InlineMindMapBlock(block: block)
+        case "postit":  PostitBlock(block: block, onDelete: onDeleteEmpty)
         default:        textView
         }
     }
@@ -354,6 +374,134 @@ struct NoteBlockRow: View {
             return count <= 20 ? c[count - 1] : "(\(count))"
         default: return "\(count)."
         }
+    }
+}
+
+// MARK: - Postit Block (포스트잇 - 자유 이동 가능)
+
+struct PostitBlock: View {
+    @Environment(\.modelContext) private var modelContext
+    @Bindable var block: NoteBlock
+    var onDelete: () -> Void
+
+    @State private var dragOffset: CGSize = .zero
+    @State private var isMoving = false
+    @State private var isEditing = false
+    @State private var editText = ""
+
+    private var bgColor: Color {
+        Color(hex: block.postitColor) ?? Color.yellow.opacity(0.3)
+    }
+
+    var body: some View {
+        let savedX = CGFloat(block.imageOffsetX)
+        let savedY = CGFloat(block.imageOffsetY)
+        let totalX = savedX + (isMoving ? dragOffset.width : 0)
+        let totalY = savedY + (isMoving ? dragOffset.height : 0)
+
+        VStack(alignment: .leading, spacing: 6) {
+            Text(block.content.isEmpty ? "메모" : block.content)
+                .font(.system(size: 13))
+                .foregroundStyle(block.content.isEmpty ? .secondary : .primary)
+                .multilineTextAlignment(.leading)
+                .frame(minWidth: 100, maxWidth: 180, minHeight: 40, alignment: .topLeading)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(bgColor)
+                .shadow(color: .black.opacity(0.15), radius: 4, x: 1, y: 3)
+        )
+        .overlay(alignment: .topTrailing) {
+            // 접힌 모서리 효과
+            Triangle()
+                .fill(Color.black.opacity(0.06))
+                .frame(width: 14, height: 14)
+        }
+        .offset(x: totalX, y: totalY)
+        .padding(.horizontal, 40)
+        .padding(.vertical, 6)
+        .gesture(
+            DragGesture(minimumDistance: 5)
+                .onChanged { val in
+                    isMoving = true
+                    dragOffset = val.translation
+                }
+                .onEnded { val in
+                    block.imageOffsetX = Double(savedX + val.translation.width)
+                    block.imageOffsetY = Double(savedY + val.translation.height)
+                    dragOffset = .zero
+                    isMoving = false
+                    try? modelContext.save()
+                }
+        )
+        .onTapGesture(count: 2) {
+            editText = block.content
+            isEditing = true
+        }
+        .contextMenu {
+            // 색상 변경
+            Menu {
+                ForEach(postitColorPalette, id: \.hex) { c in
+                    Button(c.name) {
+                        block.postitColor = c.hex
+                        try? modelContext.save()
+                    }
+                }
+            } label: {
+                Label("색상 변경", systemImage: "paintpalette")
+            }
+            Button {
+                editText = block.content
+                isEditing = true
+            } label: {
+                Label("편집", systemImage: "pencil")
+            }
+            Button {
+                block.imageOffsetX = 0; block.imageOffsetY = 0
+                try? modelContext.save()
+            } label: {
+                Label("원래 위치로", systemImage: "arrow.uturn.backward.circle")
+            }
+            Button(role: .destructive) { onDelete() } label: {
+                Label("삭제", systemImage: "trash")
+            }
+        }
+        .sheet(isPresented: $isEditing) {
+            NavigationStack {
+                Form {
+                    TextField("메모 내용", text: $editText, axis: .vertical)
+                        .lineLimit(5...10)
+                }
+                .navigationTitle("포스트잇 편집")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("취소") { isEditing = false } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("완료") {
+                            block.content = editText
+                            isEditing = false
+                            try? modelContext.save()
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.height(240)])
+        }
+    }
+}
+
+// 포스트잇 접힌 모서리 삼각형
+struct Triangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.maxX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        p.closeSubpath()
+        return p
     }
 }
 
@@ -499,12 +647,6 @@ struct InlineMindMapBlock: View {
     @State private var editingId: UUID? = nil
     @State private var editText = ""
 
-    // 포스트잇 색상 팔레트
-    private let postitColors: [(name: String, hex: String)] = [
-        ("노랑", "FEF3C7"), ("분홍", "FCE7F3"), ("연두", "D1FAE5"),
-        ("하늘", "DBEAFE"), ("보라", "EDE9FE"), ("주황", "FFEDD5")
-    ]
-
     var nodes: [MindMapNode] { block.mindMapNodes }
 
     var body: some View {
@@ -514,9 +656,9 @@ struct InlineMindMapBlock: View {
                 Color(NoteEditorColors.background)
                     .onTapGesture { selectedId = nil }
 
-                // 연결선 (node 타입만)
+                // 연결선
                 Canvas { ctx, _ in
-                    for node in nodes where node.nodeType == "node" {
+                    for node in nodes {
                         guard let pid = node.parentNodeId,
                               let pPos = positions[pid],
                               let nPos = positions[node.id] else { continue }
@@ -532,29 +674,8 @@ struct InlineMindMapBlock: View {
                 }
                 .allowsHitTesting(false)
 
-                // 포스트잇 노드
-                ForEach(nodes.filter { $0.nodeType == "postit" }) { node in
-                    PostitNodeView(
-                        node: node,
-                        position: Binding(
-                            get: { positions[node.id] ?? CGPoint(x: node.x, y: node.y) },
-                            set: { p in
-                                positions[node.id] = p
-                                node.x = p.x; node.y = p.y
-                            }
-                        ),
-                        isSelected: selectedId == node.id,
-                        onTap: { selectedId = node.id },
-                        onDoubleTap: {
-                            selectedId = node.id
-                            editText = node.text
-                            editingId = node.id
-                        }
-                    )
-                }
-
-                // 일반 마인드맵 노드
-                ForEach(nodes.filter { $0.nodeType == "node" }) { node in
+                // 노드들
+                ForEach(nodes) { node in
                     InlineMindMapNodeView(
                         node: node,
                         position: Binding(
@@ -580,39 +701,20 @@ struct InlineMindMapBlock: View {
 
             // 하단 툴바
             HStack(spacing: 12) {
-                if let selId = selectedId, let selNode = nodes.first(where: { $0.id == selId }) {
-                    if selNode.nodeType == "node" {
-                        Button { addChild(parentId: selId) } label: {
-                            Label("자식 추가", systemImage: "plus.circle")
-                                .font(.system(size: 12))
-                        }
-                        .buttonStyle(.plain)
+                if let selId = selectedId {
+                    Button { addChild(parentId: selId) } label: {
+                        Label("자식 추가", systemImage: "plus.circle")
+                            .font(.system(size: 12))
                     }
+                    .buttonStyle(.plain)
                     Button {
-                        editText = selNode.text
+                        editText = nodes.first(where: { $0.id == selId })?.text ?? ""
                         editingId = selId
                     } label: {
                         Label("편집", systemImage: "pencil")
                             .font(.system(size: 12))
                     }
                     .buttonStyle(.plain)
-
-                    // 포스트잇 색상 변경
-                    if selNode.nodeType == "postit" {
-                        Menu {
-                            ForEach(postitColors, id: \.hex) { c in
-                                Button(c.name) {
-                                    selNode.postitColor = c.hex
-                                    try? modelContext.save()
-                                }
-                            }
-                        } label: {
-                            Label("색상", systemImage: "paintpalette")
-                                .font(.system(size: 12))
-                        }
-                        .buttonStyle(.plain)
-                    }
-
                     Button { deleteNode(id: selId) } label: {
                         Label("삭제", systemImage: "trash")
                             .font(.system(size: 12))
@@ -621,13 +723,7 @@ struct InlineMindMapBlock: View {
                     .buttonStyle(.plain)
                 } else {
                     Button { addRoot() } label: {
-                        Label("노드 추가", systemImage: "plus.circle")
-                            .font(.system(size: 12))
-                    }
-                    .buttonStyle(.plain)
-
-                    Button { addPostit() } label: {
-                        Label("포스트잇", systemImage: "note.text")
+                        Label("노드 추가", systemImage: "plus")
                             .font(.system(size: 12))
                     }
                     .buttonStyle(.plain)
@@ -651,8 +747,8 @@ struct InlineMindMapBlock: View {
             set: { if !$0 { editingId = nil } }
         )) {
             NavigationStack {
-                Form { TextField("텍스트", text: $editText) }
-                    .navigationTitle("편집")
+                Form { TextField("노드 텍스트", text: $editText) }
+                    .navigationTitle("노드 편집")
                     #if os(iOS)
                     .navigationBarTitleDisplayMode(.inline)
                     #endif
@@ -675,18 +771,6 @@ struct InlineMindMapBlock: View {
 
     func addRoot() {
         let node = MindMapNode(text: "새 노드", x: 200, y: 130)
-        node.noteBlock = block
-        block.mindMapNodes.append(node)
-        modelContext.insert(node)
-        positions[node.id] = CGPoint(x: node.x, y: node.y)
-        selectedId = node.id
-        editText = node.text
-        editingId = node.id
-        try? modelContext.save()
-    }
-
-    func addPostit() {
-        let node = MindMapNode(text: "메모", x: 120, y: 80, nodeType: "postit")
         node.noteBlock = block
         block.mindMapNodes.append(node)
         modelContext.insert(node)
@@ -729,55 +813,6 @@ struct InlineMindMapBlock: View {
         block.mindMapNodes.removeAll { toDelete.contains($0.id) }
         selectedId = nil
         try? modelContext.save()
-    }
-}
-
-// MARK: - Postit Node View (포스트잇)
-
-struct PostitNodeView: View {
-    let node: MindMapNode
-    @Binding var position: CGPoint
-    let isSelected: Bool
-    let onTap: () -> Void
-    let onDoubleTap: () -> Void
-
-    @GestureState private var dragDelta: CGSize = .zero
-
-    private var bgColor: Color {
-        Color(hex: node.postitColor) ?? Color.yellow.opacity(0.3)
-    }
-
-    var body: some View {
-        Text(node.text)
-            .font(.system(size: 12))
-            .foregroundStyle(.primary)
-            .multilineTextAlignment(.leading)
-            .frame(minWidth: 80, maxWidth: 140, alignment: .topLeading)
-            .padding(10)
-            .background(
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(bgColor)
-                    .shadow(color: isSelected ? .blue.opacity(0.4) : .black.opacity(0.12),
-                            radius: isSelected ? 5 : 3, x: 1, y: 2)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 4)
-                    .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
-            )
-            .position(
-                x: position.x + dragDelta.width,
-                y: position.y + dragDelta.height
-            )
-            .gesture(
-                DragGesture(minimumDistance: 3)
-                    .updating($dragDelta) { val, state, _ in state = val.translation }
-                    .onEnded { val in
-                        position = CGPoint(x: position.x + val.translation.width,
-                                           y: position.y + val.translation.height)
-                    }
-            )
-            .onTapGesture(count: 2) { onDoubleTap() }
-            .onTapGesture(count: 1) { onTap() }
     }
 }
 
