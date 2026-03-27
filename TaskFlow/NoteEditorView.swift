@@ -362,7 +362,16 @@ struct NoteBlockRow: View {
         }
     }
 
-    // MARK: 텍스트 블록 (개요 번호)
+    // MARK: 텍스트 블록 (개요 번호 + 색상/하이라이트)
+    private var textColor: Color {
+        if !block.textColorHex.isEmpty, let c = Color(hex: block.textColorHex) { return c }
+        return .primary
+    }
+    private var highlightColor: Color? {
+        if !block.highlightHex.isEmpty, let c = Color(hex: block.highlightHex) { return c }
+        return nil
+    }
+
     var textView: some View {
         HStack(alignment: .firstTextBaseline, spacing: 0) {
             Spacer().frame(width: CGFloat(block.indentLevel) * 22)
@@ -376,6 +385,7 @@ struct NoteBlockRow: View {
                 set: { block.content = $0; try? modelContext.save() }
             ))
             .font(.system(size: 14))
+            .foregroundStyle(textColor)
             .textFieldStyle(.plain)
             .focused(focusedId, equals: block.id)
             .onSubmit { onReturn() }
@@ -395,6 +405,29 @@ struct NoteBlockRow: View {
         }
         .padding(.horizontal, 40)
         .padding(.vertical, 3)
+        .background(highlightColor?.opacity(0.5))
+        .contextMenu {
+            Menu {
+                ForEach(textColorPalette, id: \.hex) { c in
+                    Button(c.name) {
+                        block.textColorHex = c.hex
+                        try? modelContext.save()
+                    }
+                }
+            } label: {
+                Label("텍스트 색상", systemImage: "textformat")
+            }
+            Menu {
+                ForEach(highlightPalette, id: \.hex) { c in
+                    Button(c.name) {
+                        block.highlightHex = c.hex
+                        try? modelContext.save()
+                    }
+                }
+            } label: {
+                Label("하이라이트", systemImage: "highlighter")
+            }
+        }
     }
 
     // MARK: 텍스트박스 (래퍼 안에서 사용)
