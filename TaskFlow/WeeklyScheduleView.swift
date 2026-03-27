@@ -265,15 +265,16 @@ struct WeeklyScheduleView: View {
                 let startOffset = CGFloat(sched.startHour * 60 + sched.startMinute - minHour * 60) / 60.0 * hourHeight
                 let duration = CGFloat(sched.durationMinutes) / 60.0 * hourHeight
 
-                ScheduleBlockView(schedule: sched)
+                let blockDate = Calendar.current.date(byAdding: .day, value: sched.dayOfWeek, to: weekMonday)!
+
+                ScheduleBlockView(schedule: sched, date: blockDate)
                     .frame(width: dayWidth - 4, height: max(duration, 24))
                     .offset(
                         x: 44 + CGFloat(sched.dayOfWeek) * dayWidth + 2,
                         y: startOffset
                     )
                     .onTapGesture {
-                        // 이번 주 해당 요일의 날짜 계산
-                        let date = Calendar.current.date(byAdding: .day, value: sched.dayOfWeek, to: weekMonday)!
+                        let date = blockDate
                         selectedBlockInfo = ScheduleBlockInfo(schedule: sched, date: date)
                     }
                     .contextMenu {
