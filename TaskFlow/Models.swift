@@ -573,7 +573,9 @@ class NoteBlock {
     var blockHeight: Double = 0   // 0 = 기본(자동), 그 외 = 사용자 지정 높이
     var imageOffsetX: Double = 0  // 수평 오프셋
     var imageOffsetY: Double = 0  // 수직 오프셋
-    var postitColor: String = "FEF3C7"  // 포스트잇 배경색 hex
+    var postitColor: String = "FEF3C7"   // 포스트잇 배경색 hex
+    var textColorHex: String = ""        // 텍스트 색상 (빈 문자열 = 기본)
+    var highlightHex: String = ""        // 하이라이트 배경 (빈 문자열 = 없음)
     var document: NoteDocument?
     @Relationship(deleteRule: .cascade, inverse: \MindMapNode.noteBlock) var mindMapNodes: [MindMapNode] = []
 
