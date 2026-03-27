@@ -8,7 +8,6 @@ struct NotesView: View {
     @Query(sort: \NoteDocument.updatedAt, order: .reverse) private var documents: [NoteDocument]
     @State private var showingAdd = false
     @State private var newTitle = ""
-    @State private var newType = "note"   // "note" | "spreadsheet" | "mindmap"
     @State private var openNote: NoteDocument? = nil
 
     var body: some View {
