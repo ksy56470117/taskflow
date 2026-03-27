@@ -455,6 +455,7 @@ struct NoteBlockRow: View {
             set: { block.content = $0; try? modelContext.save() }
         ))
         .font(.system(size: 14))
+        .scrollContentBackground(.hidden)
         .scrollDisabled(true)
         .padding(10)
         .background(Color.blue.opacity(0.06))
