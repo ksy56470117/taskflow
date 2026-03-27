@@ -74,8 +74,10 @@ struct WeeklyScheduleView: View {
                     Text("실제").tag(1)
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 80)
-                .padding(.leading, 4)
+                .labelsHidden()
+                .frame(width: 44)
+                .scaleEffect(0.75)
+                .frame(width: 44)
 
                 // 요일 헤더
                 dayHeader
