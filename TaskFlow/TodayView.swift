@@ -290,6 +290,245 @@ struct TodayView: View {
             CalendarAddTaskSheet(date: Date(), projects: projects)
                 .presentationDetents([.medium])
         }
+        .sheet(isPresented: $showManualEntry) {
+            ManualTimeEntrySheet(projects: projects)
+                .presentationDetents([.medium])
+        }
+    }
+}
+
+// MARK: - 스테이징된 엔트리 행
+struct StagedEntryRow: View {
+    @Environment(\.modelContext) private var modelContext
+    @Bindable var entry: TimeEntry
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // 프로젝트 색상 dot
+            Circle()
+                .fill(Color(hex: entry.task?.project?.colorHex ?? "8E8E93") ?? .secondary)
+                .frame(width: 8, height: 8)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.task?.title ?? "알 수 없음")
+                    .font(.system(size: 13, weight: .medium))
+                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(timeRange(entry))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Text(formatSec(entry.seconds))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            Spacer()
+
+            // 커밋
+            Button {
+                entry.isCommitted = true
+                try? modelContext.save()
+            } label: {
+                Image(systemName: "checkmark.circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.green)
+            }
+            .buttonStyle(.plain)
+
+            // 삭제
+            Button {
+                modelContext.delete(entry)
+                try? modelContext.save()
+            } label: {
+                Image(systemName: "xmark.circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.red.opacity(0.6))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    func timeRange(_ e: TimeEntry) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "HH:mm"
+        let start = f.string(from: e.startedAt)
+        let end = e.endedAt.map { f.string(from: $0) } ?? "진행중"
+        return "\(start) ~ \(end)"
+    }
+
+    func formatSec(_ s: Int) -> String {
+        let h = s / 3600; let m = (s % 3600) / 60
+        if h > 0 { return "\(h)h \(m)m" }
+        return "\(m)m"
+    }
+}
+
+// MARK: - 수동 시간 입력 시트
+struct ManualTimeEntrySheet: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    var projects: [Project]
+
+    @State private var selectedTask: Task?
+    @State private var startTime = Date().addingTimeInterval(-3600)
+    @State private var endTime = Date()
+    @State private var expandedProject: Project?
+
+    var allTasks: [Task] {
+        projects.flatMap { $0.tasks }.filter { !$0.isCompleted }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 핸들
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color.secondary.opacity(0.3))
+                .frame(width: 36, height: 5)
+                .padding(.top, 10)
+                .padding(.bottom, 14)
+
+            Text("시간 직접 추가")
+                .font(.system(size: 17, weight: .bold))
+                .padding(.bottom, 16)
+
+            // 태스크 선택
+            VStack(alignment: .leading, spacing: 8) {
+                Text("태스크").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 4) {
+                        ForEach(projects) { project in
+                            let tasks = project.tasks.filter { !$0.isCompleted }
+                            if !tasks.isEmpty {
+                                VStack(spacing: 2) {
+                                    Button {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            expandedProject = expandedProject?.id == project.id ? nil : project
+                                        }
+                                    } label: {
+                                        HStack(spacing: 6) {
+                                            Circle().fill(Color(hex: project.colorHex) ?? .blue).frame(width: 8, height: 8)
+                                            Text(project.name).font(.system(size: 13, weight: .medium))
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                                .font(.system(size: 10))
+                                                .rotationEffect(.degrees(expandedProject?.id == project.id ? 90 : 0))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .background(Color.secondary.opacity(0.06))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    if expandedProject?.id == project.id {
+                                        ForEach(tasks) { task in
+                                            Button {
+                                                selectedTask = task
+                                            } label: {
+                                                HStack(spacing: 8) {
+                                                    Image(systemName: selectedTask?.id == task.id ? "checkmark.circle.fill" : "circle")
+                                                        .font(.system(size: 14))
+                                                        .foregroundStyle(selectedTask?.id == task.id ? .blue : .secondary)
+                                                    Text(task.title)
+                                                        .font(.system(size: 13))
+                                                        .foregroundStyle(.primary)
+                                                    Spacer()
+                                                }
+                                                .padding(.horizontal, 20)
+                                                .padding(.vertical, 6)
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .frame(maxHeight: 180)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 16)
+
+            Divider()
+
+            // 시간 선택
+            HStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("시작").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
+                    DatePicker("", selection: $startTime, displayedComponents: [.hourAndMinute])
+                        .labelsHidden()
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("종료").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
+                    DatePicker("", selection: $endTime, displayedComponents: [.hourAndMinute])
+                        .labelsHidden()
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("기록 시간").font(.system(size: 12)).foregroundStyle(.secondary)
+                    let secs = max(0, Int(endTime.timeIntervalSince(startTime)))
+                    Text(formatSec(secs))
+                        .font(.system(size: 18, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.orange)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+
+            Divider()
+            Spacer()
+
+            // 버튼
+            HStack(spacing: 10) {
+                Button { dismiss() } label: {
+                    Text("취소")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(Color.secondary.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    guard let task = selectedTask, endTime > startTime else { return }
+                    let entry = TimeEntry(task: task, startedAt: startTime, endedAt: endTime, committed: false)
+                    task.timeEntries.append(entry)
+                    modelContext.insert(entry)
+                    try? modelContext.save()
+                    dismiss()
+                } label: {
+                    Text("추가 (스테이징)")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(selectedTask != nil && endTime > startTime ? Color.orange : Color.secondary)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+                .disabled(selectedTask == nil || endTime <= startTime)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
+        }
+        .background(.background)
+    }
+
+    func formatSec(_ s: Int) -> String {
+        let h = s / 3600; let m = (s % 3600) / 60
+        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s % 60) }
+        return String(format: "%d:%02d", m, s % 60)
     }
 }
 
