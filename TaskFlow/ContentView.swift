@@ -251,6 +251,27 @@ struct ThingsSidebar: View {
                     .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                     .tag(SidebarItem.area(area.id))
                     .simultaneousGesture(TapGesture().onEnded { onTap?(.area(area.id)) })
+                    .contextMenu {
+                        Button {
+                            editName = area.name
+                            editingArea = area
+                        } label: {
+                            Label("이름 변경", systemImage: "pencil")
+                        }
+                        Button { showAddProject = area } label: {
+                            Label("프로젝트 추가", systemImage: "plus.circle")
+                        }
+                        Divider()
+                        Button(role: .destructive) {
+                            // 하위 프로젝트도 함께 삭제
+                            for proj in area.projects { modelContext.delete(proj) }
+                            modelContext.delete(area)
+                            try? modelContext.save()
+                            if selection == .area(area.id) { selection = .today }
+                        } label: {
+                            Label("삭제", systemImage: "trash")
+                        }
+                    }
 
                     // 하위 프로젝트
                     ForEach(area.projects.sorted { $0.order < $1.order }) { project in
