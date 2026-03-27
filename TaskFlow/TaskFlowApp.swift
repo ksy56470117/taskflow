@@ -14,7 +14,7 @@ struct TaskFlowApp: App {
             ScheduledTransaction.self,
             NoteDocument.self, NoteFolder.self, NoteBlock.self,
             SpreadsheetCell.self, MindMapNode.self,
-            WeeklySchedule.self,
+            WeeklySchedule.self, ScheduleTask.self,
             Tag.self
         ])
         let storeURL = Self.resolveStoreURL()
