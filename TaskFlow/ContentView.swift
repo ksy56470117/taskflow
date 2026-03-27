@@ -136,10 +136,6 @@ struct MacContentView: View {
         .sheet(item: $showAddProject) { AddProjectSheet(area: $0) }
     }
 
-    func openNote(_ note: NoteDocument) {
-        selection = .noteDocument(note.id)
-        sidebarTapCount += 1
-    }
 }
 
 // MARK: - Sidebar Item
