@@ -252,75 +252,246 @@ struct TodayView: View {
     }
 }
 
-// MARK: - 스테이징된 엔트리 행
-struct StagedEntryRow: View {
+// MARK: - Git-style Time Commit Section
+struct TimeCommitSection: View {
+    @Environment(\.modelContext) private var modelContext
+    var stagedEntries: [TimeEntry]
+    var committedEntriesToday: [TimeEntry]
+    @Binding var showManualEntry: Bool
+    var timerManager: TimerManager
+
+    @State private var commitMessage = ""
+
+    var stagedTotal: Int { stagedEntries.reduce(0) { $0 + $1.seconds } }
+    var committedTotal: Int { committedEntriesToday.reduce(0) { $0 + $1.seconds } }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // ── Staged Changes ──
+            VStack(alignment: .leading, spacing: 0) {
+                // Header
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.square.dashed")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.orange)
+                    Text("Staged Changes")
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.primary)
+                    if !stagedEntries.isEmpty {
+                        Text("\(stagedEntries.count)")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .background(Color.orange)
+                            .clipShape(Capsule())
+                    }
+                    Spacer()
+                    Button { showManualEntry = true } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 24, height: 24)
+                            .background(Color.secondary.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color.secondary.opacity(0.04))
+
+                Divider().opacity(0.5)
+
+                if stagedEntries.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary.opacity(0.5))
+                        Text("Nothing to commit")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary.opacity(0.5))
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 14)
+                } else {
+                    // Staged entries (git diff style)
+                    ForEach(stagedEntries) { entry in
+                        GitStagedRow(entry: entry)
+                    }
+
+                    Divider().opacity(0.3)
+
+                    // Commit area
+                    VStack(spacing: 8) {
+                        HStack(spacing: 8) {
+                            // Additions summary
+                            Text("+\(fmtHM(stagedTotal))")
+                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.green)
+                            Text("\(stagedEntries.count) file\(stagedEntries.count == 1 ? "" : "s") changed")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                        }
+
+                        // Commit button
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                for entry in stagedEntries { entry.isCommitted = true }
+                                try? modelContext.save()
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 13))
+                                Text("Commit \(stagedEntries.count) change\(stagedEntries.count == 1 ? "" : "s")")
+                                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                            }
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.green)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                }
+            }
+            .background(.background)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.secondary.opacity(0.15), lineWidth: 1))
+
+            Spacer().frame(height: 12)
+
+            // ── Commit History (오늘) ──
+            if !committedEntriesToday.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.green)
+                        Text("Commits")
+                            .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        Spacer()
+                        Text(fmtHM(committedTotal))
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(.green)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(Color.secondary.opacity(0.04))
+
+                    Divider().opacity(0.5)
+
+                    // Timeline
+                    ForEach(committedEntriesToday) { entry in
+                        GitCommitRow(entry: entry)
+                    }
+                }
+                .background(.background)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.secondary.opacity(0.15), lineWidth: 1))
+            }
+        }
+    }
+}
+
+// MARK: - Git Staged Row (diff style)
+struct GitStagedRow: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var entry: TimeEntry
 
     var body: some View {
         HStack(spacing: 10) {
-            // 프로젝트 색상 dot
-            Circle()
-                .fill(Color(hex: entry.task?.project?.colorHex ?? "8E8E93") ?? .secondary)
-                .frame(width: 8, height: 8)
+            // + indicator (like git diff)
+            Text("+")
+                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                .foregroundStyle(.green)
+                .frame(width: 16)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entry.task?.title ?? "알 수 없음")
-                    .font(.system(size: 13, weight: .medium))
+            // Project color
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Color(hex: entry.task?.project?.colorHex ?? "8E8E93") ?? .secondary)
+                .frame(width: 3, height: 28)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(entry.task?.title ?? "unknown")
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .lineLimit(1)
-                HStack(spacing: 6) {
-                    Text(timeRange(entry))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                    Text(formatSec(entry.seconds))
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.orange)
-                }
+                Text("\(timeStr(entry.startedAt))~\(timeStr(entry.endedAt ?? Date()))  \(fmtHM(entry.seconds))")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            // 커밋
+            // Unstage (remove)
             Button {
-                entry.isCommitted = true
-                try? modelContext.save()
+                withAnimation { modelContext.delete(entry); try? modelContext.save() }
             } label: {
-                Image(systemName: "checkmark.circle")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.green)
-            }
-            .buttonStyle(.plain)
-
-            // 삭제
-            Button {
-                modelContext.delete(entry)
-                try? modelContext.save()
-            } label: {
-                Image(systemName: "xmark.circle")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.red.opacity(0.6))
+                Image(systemName: "minus.circle")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.red.opacity(0.5))
             }
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(.vertical, 6)
+        .overlay(alignment: .bottom) { Divider().opacity(0.3).padding(.leading, 40) }
     }
 
-    func timeRange(_ e: TimeEntry) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "ko_KR")
-        f.dateFormat = "HH:mm"
-        let start = f.string(from: e.startedAt)
-        let end = e.endedAt.map { f.string(from: $0) } ?? "진행중"
-        return "\(start) ~ \(end)"
+    func timeStr(_ d: Date) -> String {
+        let f = DateFormatter(); f.dateFormat = "HH:mm"; return f.string(from: d)
+    }
+}
+
+// MARK: - Git Commit Row (history style)
+struct GitCommitRow: View {
+    var entry: TimeEntry
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // Commit dot on timeline
+            VStack(spacing: 0) {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 8, height: 8)
+            }
+            .frame(width: 16)
+
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Color(hex: entry.task?.project?.colorHex ?? "8E8E93") ?? .secondary)
+                .frame(width: 3, height: 24)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(entry.task?.title ?? "unknown")
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .lineLimit(1)
+                Text("\(timeStr(entry.startedAt))~\(timeStr(entry.endedAt ?? Date()))")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Text(fmtHM(entry.seconds))
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.green)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.green.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .overlay(alignment: .bottom) { Divider().opacity(0.3).padding(.leading, 40) }
     }
 
-    func formatSec(_ s: Int) -> String {
-        let h = s / 3600; let m = (s % 3600) / 60
-        if h > 0 { return "\(h)h \(m)m" }
-        return "\(m)m"
+    func timeStr(_ d: Date) -> String {
+        let f = DateFormatter(); f.dateFormat = "HH:mm"; return f.string(from: d)
     }
 }
 
@@ -335,70 +506,76 @@ struct ManualTimeEntrySheet: View {
     @State private var endTime = Date()
     @State private var expandedProject: Project?
 
-    var allTasks: [Task] {
-        projects.flatMap { $0.tasks }.filter { !$0.isCompleted }
-    }
-
     var body: some View {
         VStack(spacing: 0) {
-            // 핸들
-            RoundedRectangle(cornerRadius: 3)
-                .fill(Color.secondary.opacity(0.3))
-                .frame(width: 36, height: 5)
-                .padding(.top, 10)
-                .padding(.bottom, 14)
+            // Header
+            HStack {
+                Text("New Entry")
+                    .font(.system(size: 17, weight: .bold, design: .monospaced))
+                Spacer()
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.secondary.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
 
-            Text("시간 직접 추가")
-                .font(.system(size: 17, weight: .bold))
-                .padding(.bottom, 16)
+            Divider()
 
             // 태스크 선택
-            VStack(alignment: .leading, spacing: 8) {
-                Text("태스크").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("TASK")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 20)
 
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 4) {
+                    VStack(spacing: 2) {
                         ForEach(projects) { project in
                             let tasks = project.tasks.filter { !$0.isCompleted }
                             if !tasks.isEmpty {
-                                VStack(spacing: 2) {
+                                VStack(spacing: 0) {
                                     Button {
-                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                        withAnimation(.easeInOut(duration: 0.15)) {
                                             expandedProject = expandedProject?.id == project.id ? nil : project
                                         }
                                     } label: {
                                         HStack(spacing: 6) {
-                                            Circle().fill(Color(hex: project.colorHex) ?? .blue).frame(width: 8, height: 8)
-                                            Text(project.name).font(.system(size: 13, weight: .medium))
+                                            RoundedRectangle(cornerRadius: 2)
+                                                .fill(Color(hex: project.colorHex) ?? .blue)
+                                                .frame(width: 3, height: 16)
+                                            Text(project.name)
+                                                .font(.system(size: 13, weight: .medium, design: .monospaced))
                                             Spacer()
                                             Image(systemName: "chevron.right")
-                                                .font(.system(size: 10))
+                                                .font(.system(size: 9, weight: .semibold))
                                                 .rotationEffect(.degrees(expandedProject?.id == project.id ? 90 : 0))
                                                 .foregroundStyle(.secondary)
                                         }
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 8)
-                                        .background(Color.secondary.opacity(0.06))
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 7)
                                     }
                                     .buttonStyle(.plain)
 
                                     if expandedProject?.id == project.id {
                                         ForEach(tasks) { task in
-                                            Button {
-                                                selectedTask = task
-                                            } label: {
+                                            Button { selectedTask = task } label: {
                                                 HStack(spacing: 8) {
-                                                    Image(systemName: selectedTask?.id == task.id ? "checkmark.circle.fill" : "circle")
-                                                        .font(.system(size: 14))
-                                                        .foregroundStyle(selectedTask?.id == task.id ? .blue : .secondary)
-                                                    Text(task.title)
+                                                    Image(systemName: selectedTask?.id == task.id ? "checkmark.square.fill" : "square")
                                                         .font(.system(size: 13))
+                                                        .foregroundStyle(selectedTask?.id == task.id ? .green : .secondary)
+                                                    Text(task.title)
+                                                        .font(.system(size: 12, design: .monospaced))
                                                         .foregroundStyle(.primary)
                                                     Spacer()
                                                 }
-                                                .padding(.horizontal, 20)
-                                                .padding(.vertical, 6)
+                                                .padding(.horizontal, 28)
+                                                .padding(.vertical, 5)
+                                                .background(selectedTask?.id == task.id ? Color.green.opacity(0.06) : Color.clear)
                                             }
                                             .buttonStyle(.plain)
                                         }
@@ -408,82 +585,72 @@ struct ManualTimeEntrySheet: View {
                         }
                     }
                 }
-                .frame(maxHeight: 180)
+                .frame(maxHeight: 160)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 16)
+            .padding(.top, 10)
 
-            Divider()
+            Divider().padding(.top, 6)
 
             // 시간 선택
-            HStack(spacing: 20) {
+            HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("시작").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
+                    Text("START")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.secondary)
                     DatePicker("", selection: $startTime, displayedComponents: [.hourAndMinute])
                         .labelsHidden()
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("종료").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
+                    Text("END")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.secondary)
                     DatePicker("", selection: $endTime, displayedComponents: [.hourAndMinute])
                         .labelsHidden()
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("기록 시간").font(.system(size: 12)).foregroundStyle(.secondary)
+                    Text("DURATION")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.secondary)
                     let secs = max(0, Int(endTime.timeIntervalSince(startTime)))
-                    Text(formatSec(secs))
-                        .font(.system(size: 18, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.orange)
+                    Text("+\(fmtHM(secs))")
+                        .font(.system(size: 16, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.green)
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 14)
+            .padding(.vertical, 12)
 
             Divider()
             Spacer()
 
-            // 버튼
-            HStack(spacing: 10) {
-                Button { dismiss() } label: {
-                    Text("취소")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
-                        .background(Color.secondary.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+            // Stage button
+            Button {
+                guard let task = selectedTask, endTime > startTime else { return }
+                let entry = TimeEntry(task: task, startedAt: startTime, endedAt: endTime, committed: false)
+                task.timeEntries.append(entry)
+                modelContext.insert(entry)
+                try? modelContext.save()
+                dismiss()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus.square.dashed")
+                        .font(.system(size: 13))
+                    Text("Stage Change")
+                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
                 }
-                .buttonStyle(.plain)
-
-                Button {
-                    guard let task = selectedTask, endTime > startTime else { return }
-                    let entry = TimeEntry(task: task, startedAt: startTime, endedAt: endTime, committed: false)
-                    task.timeEntries.append(entry)
-                    modelContext.insert(entry)
-                    try? modelContext.save()
-                    dismiss()
-                } label: {
-                    Text("추가 (스테이징)")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
-                        .background(selectedTask != nil && endTime > startTime ? Color.orange : Color.secondary)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-                .disabled(selectedTask == nil || endTime <= startTime)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(selectedTask != nil && endTime > startTime ? Color.green : Color.secondary.opacity(0.3))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
+            .buttonStyle(.plain)
+            .disabled(selectedTask == nil || endTime <= startTime)
             .padding(.horizontal, 16)
             .padding(.bottom, 16)
         }
         .background(.background)
-    }
-
-    func formatSec(_ s: Int) -> String {
-        let h = s / 3600; let m = (s % 3600) / 60
-        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s % 60) }
-        return String(format: "%d:%02d", m, s % 60)
     }
 }
 
