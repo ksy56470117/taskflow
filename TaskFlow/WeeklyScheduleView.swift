@@ -9,6 +9,7 @@ struct WeeklyScheduleView: View {
     @Query private var timeEntries: [TimeEntry]
     @State private var showingAdd = false
     @State private var editingSchedule: WeeklySchedule? = nil
+    @State private var selectedBlockInfo: ScheduleBlockInfo? = nil  // 태스크 시트용
     @State private var tab: Int = 0  // 0=계획, 1=실제
     @State private var weekOffset: Int = 0  // 0=이번주, -1=지난주 ...
 
