@@ -394,6 +394,55 @@ struct ScheduleEditSheet: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
+
+    private func timeRow(label: String, hour: Binding<Int>, minute: Binding<Int>) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .frame(width: 40, alignment: .leading)
+            Spacer()
+            #if os(iOS)
+            Picker("", selection: hour) {
+                ForEach(6..<24, id: \.self) { h in
+                    Text(String(format: "%02d", h)).tag(h)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(width: 60, height: 80)
+            .clipped()
+            Text(":")
+                .font(.system(size: 18, weight: .medium))
+            Picker("", selection: minute) {
+                ForEach([0, 10, 15, 20, 30, 40, 45, 50], id: \.self) { m in
+                    Text(String(format: "%02d", m)).tag(m)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(width: 60, height: 80)
+            .clipped()
+            #else
+            Picker("", selection: hour) {
+                ForEach(6..<24, id: \.self) { h in
+                    Text("\(h)시").tag(h)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(width: 80)
+            Text(":")
+                .font(.system(size: 16, weight: .medium))
+            Picker("", selection: minute) {
+                ForEach([0, 10, 15, 20, 30, 40, 45, 50], id: \.self) { m in
+                    Text(String(format: "%02d분", m)).tag(m)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(width: 80)
+            #endif
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 4)
+    }
 }
 
 // MARK: - Quick Add (같은 수업 다른 요일에 복사)
