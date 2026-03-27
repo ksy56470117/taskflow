@@ -199,7 +199,7 @@ struct WeeklyScheduleView: View {
 
             Spacer()
 
-            Button { weekOffset += 1 } label: {
+            Button { weekOffset += 1; hiddenScheduleIds.removeAll() } label: {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .medium))
             }
