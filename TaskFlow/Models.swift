@@ -608,18 +608,14 @@ class MindMapNode {
     var x: Double
     var y: Double
     var parentNodeId: UUID?
-    var nodeType: String = "node"   // "node" | "postit"
-    var postitColor: String = "FEF3C7"  // 포스트잇 배경색 hex
     var document: NoteDocument?
     var noteBlock: NoteBlock?    // 인라인 마인드맵 블록에 연결
 
-    init(text: String, x: Double, y: Double, parentNodeId: UUID? = nil, nodeType: String = "node", postitColor: String = "FEF3C7") {
+    init(text: String, x: Double, y: Double, parentNodeId: UUID? = nil) {
         self.id = UUID()
         self.text = text
         self.x = x
         self.y = y
         self.parentNodeId = parentNodeId
-        self.nodeType = nodeType
-        self.postitColor = postitColor
     }
 }
