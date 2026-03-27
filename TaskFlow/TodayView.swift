@@ -33,8 +33,14 @@ struct TodayView: View {
 
     var totalSecondsToday: Int {
         allTasks.flatMap { $0.timeEntries }
-            .filter { Calendar.current.isDateInToday($0.startedAt) }
+            .filter { Calendar.current.isDateInToday($0.startedAt) && $0.isCommitted }
             .reduce(0) { $0 + $1.seconds }
+    }
+
+    var stagedEntries: [TimeEntry] {
+        allTasks.flatMap { $0.timeEntries }
+            .filter { !$0.isCommitted && !$0.isRunning && $0.endedAt != nil }
+            .sorted { $0.startedAt > $1.startedAt }
     }
 
     var completedCount: Int { allTasks.filter { $0.isCompleted }.count }
