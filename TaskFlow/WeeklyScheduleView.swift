@@ -95,7 +95,11 @@ struct WeeklyScheduleView: View {
                     .padding(.vertical, 10)
             }
         }
+        #if os(iOS)
         .background(Color(.systemBackground))
+        #else
+        .background(Color(NSColor.windowBackgroundColor))
+        #endif
     }
 
     // MARK: - 시간 그리드
