@@ -208,6 +208,11 @@ struct ThingsSidebar: View {
                     .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                     .tag(SidebarItem.studyPlan)
                     .simultaneousGesture(TapGesture().onEnded { onTap?(.studyPlan) })
+                Label("시간표", systemImage: "calendar.day.timeline.left")
+                    .font(.system(size: 12)).foregroundStyle(.primary).lineLimit(1)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
+                    .tag(SidebarItem.weeklySchedule)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.weeklySchedule) })
             }, header: {
                 Text("Study").font(.system(size: 10, weight: .semibold)).padding(.leading, 10)
             })
