@@ -437,15 +437,23 @@ struct NoteBlockRow: View {
     }
 }
 
-// MARK: - Draggable Block Wrapper (자유 이동 공통 래퍼)
+// MARK: - Draggable Block Wrapper (자유 이동 + 리사이즈 공통 래퍼)
 
 struct DraggableBlockWrapper<Content: View>: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var block: NoteBlock
+    var resizable: Bool = true
     @ViewBuilder var content: Content
 
     @State private var dragOffset: CGSize = .zero
     @State private var isMoving = false
+
+    // 리사이즈
+    @State private var resizeDelta: CGSize = .zero
+    @State private var isResizing = false
+
+    private let minW: CGFloat = 100
+    private let minH: CGFloat = 40
 
     var body: some View {
         let savedX = CGFloat(block.imageOffsetX)
@@ -453,32 +461,95 @@ struct DraggableBlockWrapper<Content: View>: View {
         let totalX = savedX + (isMoving ? dragOffset.width : 0)
         let totalY = savedY + (isMoving ? dragOffset.height : 0)
 
-        content
-            .offset(x: totalX, y: totalY)
-            .gesture(
-                DragGesture(minimumDistance: 10)
-                    .onChanged { val in
-                        isMoving = true
-                        dragOffset = val.translation
-                    }
-                    .onEnded { val in
-                        block.imageOffsetX = Double(savedX + val.translation.width)
-                        block.imageOffsetY = Double(savedY + val.translation.height)
-                        dragOffset = .zero
-                        isMoving = false
-                        try? modelContext.save()
-                    }
-            )
-            .contextMenu {
-                if block.imageOffsetX != 0 || block.imageOffsetY != 0 {
-                    Button {
-                        block.imageOffsetX = 0; block.imageOffsetY = 0
-                        try? modelContext.save()
-                    } label: {
-                        Label("원래 위치로", systemImage: "arrow.uturn.backward.circle")
-                    }
+        GeometryReader { geo in
+            let containerW = geo.size.width - 80
+            let baseW: CGFloat = block.imageWidth > 0 ? CGFloat(block.imageWidth) : containerW
+            let baseH: CGFloat = block.blockHeight > 0 ? CGFloat(block.blockHeight) : defaultHeight
+            let curW = isResizing ? max(baseW + resizeDelta.width, minW) : baseW
+            let curH = isResizing ? max(baseH + resizeDelta.height, minH) : baseH
+
+            ZStack(alignment: .bottomTrailing) {
+                content
+                    .frame(width: min(curW, containerW))
+                    .frame(height: curH)
+                    .clipped()
+
+                if resizable {
+                    // 리사이즈 핸들
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 20, height: 20)
+                        .background(Circle().fill(Color.blue.opacity(0.7)))
+                        .offset(x: -4, y: -4)
+                        .gesture(
+                            DragGesture(minimumDistance: 2)
+                                .onChanged { val in
+                                    isResizing = true
+                                    resizeDelta = val.translation
+                                }
+                                .onEnded { val in
+                                    let newW = max(baseW + val.translation.width, minW)
+                                    let newH = max(baseH + val.translation.height, minH)
+                                    block.imageWidth = Double(min(newW, containerW))
+                                    block.blockHeight = Double(newH)
+                                    resizeDelta = .zero
+                                    isResizing = false
+                                    try? modelContext.save()
+                                }
+                        )
                 }
             }
+            .offset(x: totalX, y: totalY)
+            .frame(width: geo.size.width, alignment: .leading)
+            .padding(.leading, 40)
+        }
+        .frame(height: displayHeight + 12)
+        .gesture(
+            DragGesture(minimumDistance: 10)
+                .onChanged { val in
+                    isMoving = true
+                    dragOffset = val.translation
+                }
+                .onEnded { val in
+                    block.imageOffsetX = Double(savedX + val.translation.width)
+                    block.imageOffsetY = Double(savedY + val.translation.height)
+                    dragOffset = .zero
+                    isMoving = false
+                    try? modelContext.save()
+                }
+        )
+        .contextMenu {
+            if block.imageWidth > 0 || block.blockHeight > 0 {
+                Button {
+                    block.imageWidth = 0; block.blockHeight = 0
+                    try? modelContext.save()
+                } label: {
+                    Label("원래 크기로", systemImage: "arrow.uturn.backward")
+                }
+            }
+            if block.imageOffsetX != 0 || block.imageOffsetY != 0 {
+                Button {
+                    block.imageOffsetX = 0; block.imageOffsetY = 0
+                    try? modelContext.save()
+                } label: {
+                    Label("원래 위치로", systemImage: "arrow.uturn.backward.circle")
+                }
+            }
+        }
+    }
+
+    private var defaultHeight: CGFloat {
+        switch block.blockType {
+        case "mindmap": return 260
+        case "textbox": return 80
+        default: return 30
+        }
+    }
+
+    private var displayHeight: CGFloat {
+        let base = block.blockHeight > 0 ? CGFloat(block.blockHeight) : defaultHeight
+        return isResizing ? max(base + resizeDelta.height, minH) : base
     }
 }
 
