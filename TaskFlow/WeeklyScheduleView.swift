@@ -85,7 +85,7 @@ struct WeeklyScheduleView: View {
             .padding(.top, 4)
             .padding(.bottom, 2)
 
-            dayHeaderAligned
+            dayHeader
             Divider()
 
             // 시간표 그리드
