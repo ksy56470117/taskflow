@@ -186,6 +186,13 @@ struct NoteEditorView: View {
                 }
             }
         }
+        .fileImporter(isPresented: $showPDFImporter, allowedContentTypes: [.pdf]) { result in
+            if case .success(let url) = result,
+               url.startAccessingSecurityScopedResource() {
+                defer { url.stopAccessingSecurityScopedResource() }
+                insertPDFPages(from: url)
+            }
+        }
         .onAppear {
             if document.blocks.isEmpty {
                 let b = NoteBlock(order: 0)
