@@ -855,7 +855,6 @@ struct InlineMindMapBlock: View {
                     )
                 }
             }
-            .frame(height: 260)
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
             // 하단 툴바
@@ -894,8 +893,6 @@ struct InlineMindMapBlock: View {
             .background(Color.secondary.opacity(0.06))
         }
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.18), lineWidth: 1))
-        .padding(.horizontal, 40)
-        .padding(.vertical, 6)
         .onAppear {
             for node in nodes {
                 positions[node.id] = CGPoint(x: node.x, y: node.y)
