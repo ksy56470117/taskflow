@@ -64,11 +64,6 @@ struct iOSContentView: View {
             }
             .tabItem { Label("시간표", systemImage: "calendar.day.timeline.left") }.tag(6)
 
-            NavigationStack {
-                NotesView()
-            }
-            .tabItem { Label("노트", systemImage: "note.text") }.tag(7)
-
         }
         .onAppear { timerManager.setup(context: modelContext) }
     }
