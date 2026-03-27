@@ -2,6 +2,15 @@ import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
 
+// MARK: - Cross-platform background color
+enum NoteEditorColors {
+    #if os(macOS)
+    static let background = NSColor.windowBackgroundColor
+    #else
+    static let background = UIColor.systemBackground
+    #endif
+}
+
 // MARK: - Note Editor
 
 struct NoteEditorView: View {
