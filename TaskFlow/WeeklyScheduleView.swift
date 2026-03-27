@@ -222,7 +222,7 @@ struct WeeklyScheduleView: View {
                     .font(.system(size: 13, weight: isToday ? .bold : .medium))
                     .foregroundStyle(day >= 5 ? .red.opacity(0.7) : (isToday ? .blue : .primary))
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, 4)
             }
         }
         #if os(iOS)
