@@ -6,40 +6,124 @@ import SwiftData
 struct WeeklyScheduleView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \WeeklySchedule.startHour) private var schedules: [WeeklySchedule]
+    @Query private var timeEntries: [TimeEntry]
     @State private var showingAdd = false
     @State private var editingSchedule: WeeklySchedule? = nil
+    @State private var tab: Int = 0  // 0=계획, 1=실제
+    @State private var weekOffset: Int = 0  // 0=이번주, -1=지난주 ...
 
-    // 표시할 시간 범위
+    // 선택된 주의 월요일
+    private var weekMonday: Date {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let weekday = cal.component(.weekday, from: today) // 일=1, 월=2
+        let daysToMon = (weekday == 1) ? -6 : (2 - weekday)
+        let monday = cal.date(byAdding: .day, value: daysToMon + weekOffset * 7, to: today)!
+        return monday
+    }
+
+    // 선택된 주의 날짜들 (월~일)
+    private var weekDates: [Date] {
+        (0..<7).map { Calendar.current.date(byAdding: .day, value: $0, to: weekMonday)! }
+    }
+
+    // 이번 주 TimeEntry 블록들
+    private var weekTimeBlocks: [ActualTimeBlock] {
+        let cal = Calendar.current
+        let start = weekMonday
+        let end = cal.date(byAdding: .day, value: 7, to: start)!
+        return timeEntries.compactMap { entry in
+            guard let endDate = entry.endedAt,
+                  entry.startedAt < end, endDate > start else { return nil }
+            let clampedStart = max(entry.startedAt, start)
+            let clampedEnd = min(endDate, end)
+            let dayIndex = cal.dateComponents([.day], from: start, to: clampedStart).day ?? 0
+            let startMin = cal.component(.hour, from: clampedStart) * 60 + cal.component(.minute, from: clampedStart)
+            let endMin = cal.component(.hour, from: clampedEnd) * 60 + cal.component(.minute, from: clampedEnd)
+            let projectName = entry.task?.project?.name ?? entry.task?.title ?? "기타"
+            let colorHex = entry.task?.project?.colorHex ?? "6B7280"
+            return ActualTimeBlock(
+                id: entry.id, dayIndex: min(dayIndex, 6),
+                startMinute: startMin, endMinute: max(endMin, startMin + 5),
+                title: projectName, colorHex: colorHex
+            )
+        }
+    }
+
+    // 표시 시간 범위
     private var minHour: Int {
-        let earliest = schedules.map(\.startHour).min() ?? 9
-        return max(earliest - 1, 0)
+        if tab == 0 {
+            let earliest = schedules.map(\.startHour).min() ?? 9
+            return max(earliest - 1, 0)
+        } else {
+            let earliest = weekTimeBlocks.map { $0.startMinute / 60 }.min() ?? 9
+            return max(earliest - 1, 0)
+        }
     }
     private var maxHour: Int {
-        let latest = schedules.map(\.endHour).max() ?? 18
-        return min(latest + 1, 24)
+        if tab == 0 {
+            let latest = schedules.map(\.endHour).max() ?? 18
+            return min(latest + 1, 24)
+        } else {
+            let latest = weekTimeBlocks.map { ($0.endMinute + 59) / 60 }.max() ?? 18
+            return min(latest + 1, 24)
+        }
     }
     private var displayHours: [Int] { Array(minHour...maxHour) }
 
     private let hourHeight: CGFloat = 60
     private let dayNames = WeeklySchedule.dayNames
 
+    // 주간 합계
+    private var weekTotalSeconds: Int {
+        weekTimeBlocks.reduce(0) { $0 + ($1.endMinute - $1.startMinute) * 60 }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
+            // 탭: 계획 / 실제
+            Picker("", selection: $tab) {
+                Text("계획").tag(0)
+                Text("실제").tag(1)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
+
+            // 실제 탭: 주 이동 + 합계
+            if tab == 1 {
+                weekNavigator
+            }
+
             // 요일 헤더
             dayHeader
 
             Divider()
 
             // 시간표 그리드
-            ScrollView(.vertical, showsIndicators: true) {
-                ZStack(alignment: .topLeading) {
-                    // 시간 라인 + 라벨
-                    timeGrid
-
-                    // 스케줄 블록들
-                    scheduleBlocks
+            if (tab == 0 && schedules.isEmpty) || (tab == 1 && weekTimeBlocks.isEmpty) {
+                Spacer()
+                VStack(spacing: 8) {
+                    Image(systemName: tab == 0 ? "calendar.badge.plus" : "clock")
+                        .font(.system(size: 36))
+                        .foregroundStyle(.tertiary)
+                    Text(tab == 0 ? "스케줄을 추가하세요" : "이 주의 기록이 없습니다")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.tertiary)
                 }
-                .frame(height: CGFloat(displayHours.count) * hourHeight)
+                Spacer()
+            } else {
+                ScrollView(.vertical, showsIndicators: true) {
+                    ZStack(alignment: .topLeading) {
+                        timeGrid
+                        if tab == 0 {
+                            scheduleBlocks
+                        } else {
+                            actualBlocks
+                        }
+                    }
+                    .frame(height: CGFloat(displayHours.count) * hourHeight)
+                }
             }
         }
         .navigationTitle("시간표")
@@ -47,8 +131,10 @@ struct WeeklyScheduleView: View {
         .navigationBarTitleDisplayMode(.large)
         #endif
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { showingAdd = true } label: { Image(systemName: "plus") }
+            if tab == 0 {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { showingAdd = true } label: { Image(systemName: "plus") }
+                }
             }
         }
         .sheet(isPresented: $showingAdd) {
@@ -75,6 +161,64 @@ struct WeeklyScheduleView: View {
                 try? modelContext.save()
             }
         }
+    }
+
+    // MARK: - 주 이동 네비게이터
+
+    private var weekNavigator: some View {
+        HStack {
+            Button { weekOffset -= 1 } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 14, weight: .medium))
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            VStack(spacing: 2) {
+                let df = DateFormatter()
+                Text({
+                    df.locale = Locale(identifier: "ko_KR")
+                    df.dateFormat = "M/d"
+                    let mon = df.string(from: weekDates.first ?? Date())
+                    let sun = df.string(from: weekDates.last ?? Date())
+                    return "\(mon) ~ \(sun)"
+                }())
+                .font(.system(size: 14, weight: .semibold))
+
+                if weekTotalSeconds > 0 {
+                    let h = weekTotalSeconds / 3600
+                    let m = (weekTotalSeconds % 3600) / 60
+                    Text("총 \(h)시간 \(m)분")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            Button { weekOffset += 1 } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .medium))
+            }
+            .buttonStyle(.plain)
+            .disabled(weekOffset >= 0)
+
+            if weekOffset != 0 {
+                Button {
+                    weekOffset = 0
+                } label: {
+                    Text("이번 주")
+                        .font(.system(size: 12))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Color.blue.opacity(0.1)))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 6)
     }
 
     // MARK: - 요일 헤더
