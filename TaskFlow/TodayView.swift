@@ -935,6 +935,28 @@ struct TaskEditSheet: View {
             }
 
             Divider()
+
+            // 반복
+            HStack(spacing: 10) {
+                Image(systemName: "repeat")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22)
+                Text("반복")
+                    .font(.system(size: 14))
+                Spacer()
+                Picker("", selection: $recurrence) {
+                    Text("없음").tag("")
+                    Text("매일").tag("daily")
+                    Text("매주").tag("weekly")
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 180)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+
+            Divider()
             Spacer()
 
             // 버튼
