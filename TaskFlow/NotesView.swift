@@ -50,15 +50,14 @@ struct NotesView: View {
             }
         }
         .sheet(isPresented: $showingAdd) {
-            AddNoteSheetWithType(title: $newTitle, noteType: $newType) {
-                let doc = NoteDocument(title: newTitle, type: newType)
+            AddNoteSheet(title: $newTitle) {
+                let doc = NoteDocument(title: newTitle, type: "note")
                 modelContext.insert(doc)
                 try? modelContext.save()
                 showingAdd = false
                 newTitle = ""
-                newType = "note"
                 openNote = doc
-            } onCancel: { showingAdd = false; newTitle = ""; newType = "note" }
+            } onCancel: { showingAdd = false; newTitle = "" }
         }
         .sheet(item: $openNote) { note in
             NavigationStack {
