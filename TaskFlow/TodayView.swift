@@ -65,6 +65,7 @@ struct TodayView: View {
     }
 
     @State private var showAddTaskNoProject = false
+    @State private var showManualEntry = false
 
     var body: some View {
         ScrollView {
