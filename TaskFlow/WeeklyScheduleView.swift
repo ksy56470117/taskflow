@@ -120,8 +120,8 @@ struct WeeklyScheduleView: View {
                 }
             }
         }
-        .navigationTitle("시간표")
         #if os(iOS)
+        .navigationTitle("시간표")
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
