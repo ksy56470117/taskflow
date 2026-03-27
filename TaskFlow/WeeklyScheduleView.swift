@@ -299,6 +299,55 @@ struct WeeklyScheduleView: View {
         }
     }
 
+    // MARK: - 계획 블록 (실제 탭에서 반투명 배경)
+
+    @State private var hiddenScheduleIds: Set<UUID> = []
+
+    private var ghostScheduleBlocks: some View {
+        GeometryReader { geo in
+            let dayWidth = (geo.size.width - 44) / 7
+
+            ForEach(schedules.filter { !hiddenScheduleIds.contains($0.id) }) { sched in
+                let startOffset = CGFloat(sched.startHour * 60 + sched.startMinute - minHour * 60) / 60.0 * hourHeight
+                let duration = CGFloat(sched.durationMinutes) / 60.0 * hourHeight
+                let color = Color(hex: sched.colorHex) ?? .blue
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(sched.title)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(color.opacity(0.6))
+                        .lineLimit(1)
+                    if !sched.location.isEmpty {
+                        Text(sched.location)
+                            .font(.system(size: 8))
+                            .foregroundStyle(color.opacity(0.4))
+                            .lineLimit(1)
+                    }
+                }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 3)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .frame(width: dayWidth - 4, height: max(duration, 24))
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(color.opacity(0.25), lineWidth: 1)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(color.opacity(0.06)))
+                )
+                .offset(
+                    x: 44 + CGFloat(sched.dayOfWeek) * dayWidth + 2,
+                    y: startOffset
+                )
+                .contextMenu {
+                    Button(role: .destructive) {
+                        hiddenScheduleIds.insert(sched.id)
+                    } label: {
+                        Label("이 주에서 숨기기", systemImage: "eye.slash")
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - 실제 시간 블록들
 
     private var actualBlocks: some View {
