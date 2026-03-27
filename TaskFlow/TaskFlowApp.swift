@@ -67,7 +67,7 @@ struct TaskFlowApp: App {
                 ))
             }
             try? ctx.save()
-            UserDefaults.standard.set(true, forKey: "didSeedScheduleV2")
+            UserDefaults.standard.set(true, forKey: "didSeedScheduleV3")
         }
 
     }
