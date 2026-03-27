@@ -65,6 +65,9 @@ struct WeeklyScheduleView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // 요일 헤더 (항상 최상단)
+            dayHeader
+
             // 탭: 계획 / 실제
             Picker("", selection: $tab) {
                 Text("계획").tag(0)
@@ -72,15 +75,12 @@ struct WeeklyScheduleView: View {
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 20)
-            .padding(.vertical, 8)
+            .padding(.vertical, 6)
 
             // 실제 탭: 주 이동 + 합계
             if tab == 1 {
                 weekNavigator
             }
-
-            // 요일 헤더
-            dayHeader
 
             Divider()
 
