@@ -210,18 +210,12 @@ struct WeeklyScheduleView: View {
 
     private var dayHeader: some View {
         HStack(spacing: 0) {
-            // 시간 라벨 영역
-            Color.clear.frame(width: 44)
-
             ForEach(0..<7, id: \.self) { day in
                 let isToday = Calendar.current.component(.weekday, from: Date()) == (day + 2) % 7 + 1
-                // weekday: 일=1, 월=2 ...  / day: 월=0, 화=1 ...
-
                 Text(dayNames[day])
-                    .font(.system(size: 13, weight: isToday ? .bold : .medium))
+                    .font(.system(size: 12, weight: isToday ? .bold : .medium))
                     .foregroundStyle(day >= 5 ? .red.opacity(0.7) : (isToday ? .blue : .primary))
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 2)
             }
         }
     }
