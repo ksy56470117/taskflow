@@ -294,6 +294,23 @@ struct ThingsSidebar: View {
                         .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                         .tag(SidebarItem.project(project.id))
                         .simultaneousGesture(TapGesture().onEnded { onTap?(.project(project.id)) })
+                        .contextMenu {
+                            Button {
+                                editName = project.name
+                                editColorHex = project.colorHex
+                                editingProject = project
+                            } label: {
+                                Label("편집", systemImage: "pencil")
+                            }
+                            Divider()
+                            Button(role: .destructive) {
+                                modelContext.delete(project)
+                                try? modelContext.save()
+                                if selection == .project(project.id) { selection = .today }
+                            } label: {
+                                Label("삭제", systemImage: "trash")
+                            }
+                        }
                     }
                 })
             }
