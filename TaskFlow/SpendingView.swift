@@ -341,9 +341,7 @@ struct CalDayCell: View {
     }
 
     func compact(_ p: Int) -> String {
-        if p >= 10_000 { return "\(p / 10_000)만" }
-        let f = NumberFormatter(); f.numberStyle = .decimal
-        return f.string(from: NSNumber(value: p)) ?? "\(p)"
+        return "\(p)"
     }
 }
 
@@ -695,13 +693,23 @@ struct TransactionRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(transaction.memo.isEmpty ? transaction.category : transaction.memo)
                     .font(.system(size: 15))
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Text(transaction.category)
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
-                    Text("·")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.tertiary)
+                    if !transaction.subcategory.isEmpty {
+                        Text("·").font(.system(size: 12)).foregroundStyle(.tertiary)
+                        Text(transaction.subcategory)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    if !transaction.store.isEmpty {
+                        Text("·").font(.system(size: 12)).foregroundStyle(.tertiary)
+                        Text(transaction.store)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    Text("·").font(.system(size: 12)).foregroundStyle(.tertiary)
                     Text(transaction.paymentMethod)
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
@@ -1020,15 +1028,26 @@ struct AddTransactionSheet: View {
 
     @State private var type = "expense"
     @State private var amountText = ""
-    @State private var category = "식비"
+    @State private var category = "중고거래"
+    @State private var subcategory = ""
     @State private var paymentMethod = "카드"
+    @State private var store = ""
+    @State private var customStores: [String] = UserDefaults.standard.stringArray(forKey: "customStores") ?? []
+    @State private var showManageStores = false
+    @State private var customExpenseCategories: [String] = UserDefaults.standard.stringArray(forKey: "customExpenseCategories") ?? []
+    @State private var customIncomeCategories: [String] = UserDefaults.standard.stringArray(forKey: "customIncomeCategories") ?? []
+    @State private var showManageCategories = false
     @State private var memo = ""
     @State private var date = Date()
     @State private var isPlanned = false
 
     var isEditing: Bool { editTransaction != nil }
     var accentColor: Color { type == "expense" ? .red : .blue }
-    var categories: [String] { type == "expense" ? Transaction.expenseCategories : Transaction.incomeCategories }
+    var categories: [String] {
+        type == "expense"
+            ? Transaction.expenseCategories + customExpenseCategories
+            : Transaction.incomeCategories + customIncomeCategories
+    }
 
     @State private var showDatePicker = false
 
@@ -1061,6 +1080,7 @@ struct AddTransactionSheet: View {
                                 category = val == "expense"
                                     ? Transaction.expenseCategories[0]
                                     : Transaction.incomeCategories[0]
+                                subcategory = ""
                             }
                         } label: {
                             Text(label)
@@ -1111,25 +1131,80 @@ struct AddTransactionSheet: View {
                 // MARK: 분류
                 infoRow(label: type == "expense" ? "지출 분류" : "수입 분류") {
                     let catColor = Color(hex: Transaction.categoryColor[category] ?? "9CA3AF") ?? .secondary
-                    Menu {
-                        ForEach(categories, id: \.self) { cat in
-                            Button { withAnimation { category = cat } } label: {
-                                Label(cat, systemImage: Transaction.categoryIcon[cat] ?? "tag")
+                    HStack(spacing: 8) {
+                        Menu {
+                            ForEach(categories, id: \.self) { cat in
+                                Button { withAnimation { category = cat } } label: {
+                                    Label(cat, systemImage: Transaction.categoryIcon[cat] ?? "tag")
+                                }
                             }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Circle().fill(catColor).frame(width: 8, height: 8)
+                                Text(category)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(.primary)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(Color.secondary.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 7))
+                            .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.secondary.opacity(0.25), lineWidth: 1))
                         }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Circle().fill(catColor).frame(width: 8, height: 8)
-                            Text(category)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.primary)
+                        .buttonStyle(.plain)
+
+                        Button { showManageCategories = true } label: {
+                            Image(systemName: "plus.circle")
+                                .font(.system(size: 18))
+                                .foregroundStyle(.secondary)
                         }
-                        .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(Color.secondary.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 7))
-                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.secondary.opacity(0.25), lineWidth: 1))
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                }
+                .sheet(isPresented: $showManageCategories, onDismiss: {
+                    customExpenseCategories = UserDefaults.standard.stringArray(forKey: "customExpenseCategories") ?? []
+                    customIncomeCategories  = UserDefaults.standard.stringArray(forKey: "customIncomeCategories")  ?? []
+                }) {
+                    ManageCategoriesSheet()
+                }
+
+                // 구독 서브카테고리
+                if category == "구독" {
+                    infoRow(label: "구독 서비스") {
+                        Menu {
+                            Button { subcategory = "" } label: {
+                                HStack {
+                                    Text("선택 안 함")
+                                    if subcategory.isEmpty { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Divider()
+                            ForEach(Transaction.subscriptionSubcategories, id: \.self) { sub in
+                                Button { subcategory = sub } label: {
+                                    HStack {
+                                        Text(sub)
+                                        if subcategory == sub { Image(systemName: "checkmark") }
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text(subcategory.isEmpty ? "서비스 선택" : subcategory)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(subcategory.isEmpty ? .secondary : .primary)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(Color.secondary.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 7))
+                            .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.secondary.opacity(0.25), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
 
                 Divider().padding(.horizontal, 16)
@@ -1153,6 +1228,67 @@ struct AddTransactionSheet: View {
                             }
                         }
                     }
+                    Divider().padding(.horizontal, 16)
+
+                    // MARK: 구매처
+                    infoRow(label: "판매처") {
+                        HStack(spacing: 8) {
+                            Menu {
+                                Button { withAnimation { store = "" } } label: {
+                                    Label("없음", systemImage: "xmark")
+                                }
+                                Divider()
+                                ForEach(Transaction.stores, id: \.self) { s in
+                                    Button { withAnimation { store = s } } label: {
+                                        Label(s, systemImage: Transaction.storeIcon[s] ?? "bag")
+                                    }
+                                }
+                                if !customStores.isEmpty {
+                                    Divider()
+                                    ForEach(customStores, id: \.self) { s in
+                                        Button { withAnimation { store = s } } label: {
+                                            Label(s, systemImage: "tag")
+                                        }
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 5) {
+                                    if store.isEmpty {
+                                        Text("선택 안 함")
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(.secondary)
+                                    } else {
+                                        Image(systemName: Transaction.storeIcon[store] ?? "tag")
+                                            .font(.system(size: 11))
+                                        Text(store)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(.primary)
+                                    }
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.horizontal, 10).padding(.vertical, 5)
+                                .background(Color.secondary.opacity(0.1))
+                                .clipShape(RoundedRectangle(cornerRadius: 7))
+                                .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.secondary.opacity(0.25), lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+
+                            Button { showManageStores = true } label: {
+                                Image(systemName: "plus.circle")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .sheet(isPresented: $showManageStores, onDismiss: {
+                        customStores = UserDefaults.standard.stringArray(forKey: "customStores") ?? []
+                    }) {
+                        ManageStoresSheet()
+                    }
+
                     Divider().padding(.horizontal, 16)
                 }
 
@@ -1255,24 +1391,29 @@ struct AddTransactionSheet: View {
         type = t.type
         amountText = "\(t.amount)"
         category = t.category
+        subcategory = t.subcategory
         paymentMethod = t.paymentMethod
         memo = t.memo
         date = t.date
         isPlanned = t.isPlanned
+        store = t.store
     }
+
+    var resolvedStore: String { store }
 
     func submit() {
         let amount = Int(amountText.replacingOccurrences(of: ",", with: "")) ?? 0
         guard amount > 0 else { return }
         if let t = editTransaction {
             t.type = type; t.amount = amount; t.category = category
+            t.subcategory = subcategory
             t.paymentMethod = paymentMethod; t.memo = memo; t.date = date
-            t.isPlanned = isPlanned
+            t.isPlanned = isPlanned; t.store = resolvedStore
         } else {
             let t = Transaction(
                 amount: amount, type: type, category: category,
                 paymentMethod: paymentMethod, memo: memo, date: date,
-                isPlanned: isPlanned
+                isPlanned: isPlanned, store: resolvedStore, subcategory: subcategory
             )
             modelContext.insert(t)
         }
@@ -2003,7 +2144,7 @@ struct AddScheduledTransactionSheet: View {
     @State private var title = ""
     @State private var type = "expense"
     @State private var amountText = ""
-    @State private var category = "식비"
+    @State private var category = "중고거래"
     @State private var paymentMethod = "카드"
     @State private var dayOfMonth = 1
     @State private var memo = ""
@@ -2107,4 +2248,157 @@ func formatPrice(_ p: Int) -> String {
     let f = NumberFormatter()
     f.numberStyle = .decimal
     return (f.string(from: NSNumber(value: p)) ?? "\(p)") + "원"
+}
+
+// MARK: - 판매처 관리 시트
+struct ManageStoresSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var customStores: [String] = UserDefaults.standard.stringArray(forKey: "customStores") ?? []
+    @State private var newName = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    HStack {
+                        TextField("판매처 이름 입력", text: $newName)
+                        Button {
+                            let name = newName.trimmingCharacters(in: .whitespaces)
+                            guard !name.isEmpty, !customStores.contains(name),
+                                  !Transaction.stores.contains(name) else { return }
+                            customStores.append(name)
+                            UserDefaults.standard.set(customStores, forKey: "customStores")
+                            newName = ""
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .foregroundStyle(.blue)
+                                .font(.system(size: 20))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                } header: { Text("새 판매처 추가") }
+
+                if !customStores.isEmpty {
+                    Section {
+                        ForEach(customStores, id: \.self) { s in
+                            Label(s, systemImage: "tag")
+                        }
+                        .onDelete { idxs in
+                            customStores.remove(atOffsets: idxs)
+                            UserDefaults.standard.set(customStores, forKey: "customStores")
+                        }
+                    } header: { Text("내가 추가한 판매처") }
+                }
+
+                Section {
+                    ForEach(Transaction.stores, id: \.self) { s in
+                        Label(s, systemImage: Transaction.storeIcon[s] ?? "bag")
+                            .foregroundStyle(.secondary)
+                    }
+                } header: { Text("기본 판매처") }
+            }
+            .navigationTitle("판매처 관리")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("완료") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
+// MARK: - 카테고리 관리 시트
+struct ManageCategoriesSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedType = "expense"
+    @State private var customExpense: [String] = UserDefaults.standard.stringArray(forKey: "customExpenseCategories") ?? []
+    @State private var customIncome:  [String] = UserDefaults.standard.stringArray(forKey: "customIncomeCategories")  ?? []
+    @State private var newName = ""
+
+    var customList: [String] { selectedType == "expense" ? customExpense : customIncome }
+    var defaultList: [String] { selectedType == "expense" ? Transaction.expenseCategories : Transaction.incomeCategories }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                // 타입 선택
+                Section {
+                    Picker("", selection: $selectedType) {
+                        Text("지출").tag("expense")
+                        Text("수입").tag("income")
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowBackground(Color.clear)
+                }
+
+                // 추가
+                Section {
+                    HStack {
+                        TextField("카테고리 이름", text: $newName)
+                        Button {
+                            let name = newName.trimmingCharacters(in: .whitespaces)
+                            guard !name.isEmpty,
+                                  !customList.contains(name),
+                                  !defaultList.contains(name) else { return }
+                            if selectedType == "expense" {
+                                customExpense.append(name)
+                                UserDefaults.standard.set(customExpense, forKey: "customExpenseCategories")
+                            } else {
+                                customIncome.append(name)
+                                UserDefaults.standard.set(customIncome, forKey: "customIncomeCategories")
+                            }
+                            newName = ""
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .foregroundStyle(.blue)
+                                .font(.system(size: 20))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                } header: { Text("새 카테고리 추가") }
+
+                // 내가 추가한 것
+                if !customList.isEmpty {
+                    Section {
+                        ForEach(customList, id: \.self) { cat in
+                            Label(cat, systemImage: "tag")
+                        }
+                        .onDelete { idxs in
+                            if selectedType == "expense" {
+                                customExpense.remove(atOffsets: idxs)
+                                UserDefaults.standard.set(customExpense, forKey: "customExpenseCategories")
+                            } else {
+                                customIncome.remove(atOffsets: idxs)
+                                UserDefaults.standard.set(customIncome, forKey: "customIncomeCategories")
+                            }
+                        }
+                    } header: { Text("내가 추가한 카테고리") }
+                }
+
+                // 기본 카테고리
+                Section {
+                    ForEach(defaultList, id: \.self) { cat in
+                        Label(cat, systemImage: Transaction.categoryIcon[cat] ?? "tag")
+                            .foregroundStyle(.secondary)
+                    }
+                } header: { Text("기본 카테고리") }
+            }
+            .navigationTitle("카테고리 관리")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("완료") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
 }

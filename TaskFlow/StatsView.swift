@@ -11,70 +11,19 @@ struct StatsView: View {
 
     enum StatTab: String, CaseIterable { case daily = "일간"; case weekly = "주간"; case monthly = "월간" }
 
-    var allEntries: [TimeEntry] { projects.flatMap { $0.tasks }.flatMap { $0.timeEntries } }
-
-    var monthTotal: Int {
-        let cal = Calendar.current
-        return allEntries.filter { cal.isDate($0.startedAt, equalTo: currentMonth, toGranularity: .month) }
-            .reduce(0) { $0 + $1.seconds }
-    }
+    var allEntries: [TimeEntry] { projects.flatMap { $0.tasks }.flatMap { $0.timeEntries }.filter { $0.isCommitted } }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
 
-                // MARK: Month nav
-                HStack(spacing: 16) {
-                    Button {
-                        currentMonth = Calendar.current.date(byAdding: .month, value: -1, to: currentMonth)!
-                    } label: {
-                        Image(systemName: "chevron.left").font(.system(size: 15, weight: .semibold))
-                    }
-                    .buttonStyle(.plain)
-
-                    Text(monthString(currentMonth))
-                        .font(.system(size: 18, weight: .bold))
-                        .frame(minWidth: 60, alignment: .center)
-
-                    Button {
-                        currentMonth = Calendar.current.date(byAdding: .month, value: 1, to: currentMonth)!
-                    } label: {
-                        Image(systemName: "chevron.right").font(.system(size: 15, weight: .semibold))
-                    }
-                    .buttonStyle(.plain)
-
-                    Spacer()
-
-                    Text("\(monthString(currentMonth)): \(fmtHM(monthTotal))")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
-                .background(.background)
-
-                // MARK: Calendar heatmap
-                MonthCalendarView(
-                    month: currentMonth,
+                // MARK: GitHub-style Contribution Heatmap
+                ContributionHeatmapView(
                     allEntries: allEntries,
                     selectedDate: $selectedDate
                 )
-                .padding(.horizontal, 8)
-                .padding(.bottom, 8)
-                .background(.background)
-
-                // MARK: Legend
-                HStack(spacing: 6) {
-                    ForEach(zip(["0+","4+","7+","10+","12+"], heatColors).map { $0 }, id: \.0) { label, color in
-                        HStack(spacing: 3) {
-                            RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 12, height: 12)
-                            Text(label).font(.system(size: 10)).foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 14)
                 .background(.background)
 
                 Divider()
@@ -118,14 +67,185 @@ struct StatsView: View {
         }
         .background(Color.secondary.opacity(0.06))
     }
+}
 
-    var heatColors: [Color] {
-        [Color.secondary.opacity(0.12), Color.orange.opacity(0.25), Color.orange.opacity(0.5), Color.orange.opacity(0.75), Color.orange]
+// MARK: - GitHub-style Contribution Heatmap
+struct ContributionHeatmapView: View {
+    var allEntries: [TimeEntry]
+    @Binding var selectedDate: Date?
+
+    private let cal = Calendar.current
+    private let cellSize: CGFloat = 13
+    private let cellSpacing: CGFloat = 3
+    private let weekCount = 26 // ~6개월
+    private let dayLabels = ["", "월", "", "수", "", "금", ""]
+
+    // 최근 weekCount주 동안의 날짜 그리드 (행=요일, 열=주)
+    private var gridData: [[Date?]] {
+        let today = cal.startOfDay(for: Date())
+        let todayWeekday = (cal.component(.weekday, from: today) + 5) % 7 // 월=0 ... 일=6
+
+        // 이번 주 월요일
+        let thisMonday = cal.date(byAdding: .day, value: -todayWeekday, to: today)!
+        // 시작 월요일 (weekCount주 전)
+        let startMonday = cal.date(byAdding: .weekOfYear, value: -(weekCount - 1), to: thisMonday)!
+
+        var grid: [[Date?]] = Array(repeating: Array(repeating: nil, count: weekCount), count: 7)
+
+        for weekIdx in 0..<weekCount {
+            let monday = cal.date(byAdding: .weekOfYear, value: weekIdx, to: startMonday)!
+            for dayIdx in 0..<7 {
+                let date = cal.date(byAdding: .day, value: dayIdx, to: monday)!
+                if date <= today {
+                    grid[dayIdx][weekIdx] = date
+                }
+            }
+        }
+        return grid
     }
 
-    func monthString(_ d: Date) -> String {
-        let f = DateFormatter(); f.locale = Locale(identifier: "ko_KR"); f.dateFormat = "M월"
-        return f.string(from: d)
+    // 월 레이블 위치
+    private var monthLabels: [(String, Int)] {
+        let today = cal.startOfDay(for: Date())
+        let todayWeekday = (cal.component(.weekday, from: today) + 5) % 7
+        let thisMonday = cal.date(byAdding: .day, value: -todayWeekday, to: today)!
+        let startMonday = cal.date(byAdding: .weekOfYear, value: -(weekCount - 1), to: thisMonday)!
+
+        var labels: [(String, Int)] = []
+        var lastMonth = -1
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "ko_KR")
+        fmt.dateFormat = "M월"
+
+        for weekIdx in 0..<weekCount {
+            let monday = cal.date(byAdding: .weekOfYear, value: weekIdx, to: startMonday)!
+            let m = cal.component(.month, from: monday)
+            if m != lastMonth {
+                labels.append((fmt.string(from: monday), weekIdx))
+                lastMonth = m
+            }
+        }
+        return labels
+    }
+
+    private func secondsOn(_ date: Date) -> Int {
+        allEntries.filter { cal.isDate($0.startedAt, inSameDayAs: date) }.reduce(0) { $0 + $1.seconds }
+    }
+
+    private func heatColor(_ date: Date) -> Color {
+        let h = Double(secondsOn(date)) / 3600
+        if h == 0   { return Color.secondary.opacity(0.08) }
+        if h < 2    { return Color.green.opacity(0.25) }
+        if h < 4    { return Color.green.opacity(0.45) }
+        if h < 7    { return Color.green.opacity(0.65) }
+        if h < 10   { return Color.green.opacity(0.85) }
+        return Color.green
+    }
+
+    private var totalSeconds: Int {
+        let today = cal.startOfDay(for: Date())
+        let todayWeekday = (cal.component(.weekday, from: today) + 5) % 7
+        let thisMonday = cal.date(byAdding: .day, value: -todayWeekday, to: today)!
+        let start = cal.date(byAdding: .weekOfYear, value: -(weekCount - 1), to: thisMonday)!
+        return allEntries.filter { $0.startedAt >= start && $0.startedAt <= today }.reduce(0) { $0 + $1.seconds }
+    }
+
+    private var activeDays: Int {
+        let today = cal.startOfDay(for: Date())
+        let todayWeekday = (cal.component(.weekday, from: today) + 5) % 7
+        let thisMonday = cal.date(byAdding: .day, value: -todayWeekday, to: today)!
+        let start = cal.date(byAdding: .weekOfYear, value: -(weekCount - 1), to: thisMonday)!
+        return Set(allEntries.filter { $0.startedAt >= start && $0.startedAt <= today }
+            .map { cal.startOfDay(for: $0.startedAt) }).count
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Summary
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("최근 6개월")
+                        .font(.system(size: 16, weight: .bold))
+                    Text("\(fmtHM(totalSeconds)) · \(activeDays)일 활동")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+
+            // Month labels
+            HStack(spacing: 0) {
+                // day label column width
+                Color.clear.frame(width: 22)
+
+                let totalWidth = CGFloat(weekCount) * (cellSize + cellSpacing) - cellSpacing
+                ZStack(alignment: .topLeading) {
+                    Color.clear.frame(width: totalWidth, height: 16)
+                    ForEach(monthLabels, id: \.1) { label, weekIdx in
+                        Text(label)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .offset(x: CGFloat(weekIdx) * (cellSize + cellSpacing))
+                    }
+                }
+            }
+
+            // Heatmap grid
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 0) {
+                        // Day labels
+                        VStack(spacing: cellSpacing) {
+                            ForEach(0..<7, id: \.self) { dayIdx in
+                                Text(dayLabels[dayIdx])
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 22, height: cellSize, alignment: .trailing)
+                            }
+                        }
+
+                        // Cells
+                        HStack(spacing: cellSpacing) {
+                            ForEach(0..<weekCount, id: \.self) { weekIdx in
+                                VStack(spacing: cellSpacing) {
+                                    ForEach(0..<7, id: \.self) { dayIdx in
+                                        if let date = gridData[dayIdx][weekIdx] {
+                                            let isSelected = selectedDate.map { cal.isDate($0, inSameDayAs: date) } ?? false
+                                            RoundedRectangle(cornerRadius: 2)
+                                                .fill(heatColor(date))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 2)
+                                                        .strokeBorder(isSelected ? Color.ghGreen : Color.clear, lineWidth: 1.5)
+                                                )
+                                                .frame(width: cellSize, height: cellSize)
+                                                .onTapGesture { selectedDate = date }
+                                        } else {
+                                            Color.clear.frame(width: cellSize, height: cellSize)
+                                        }
+                                    }
+                                }
+                                .id(weekIdx)
+                            }
+                        }
+                    }
+                }
+                .onAppear {
+                    proxy.scrollTo(weekCount - 1, anchor: .trailing)
+                }
+            }
+
+            // Legend
+            HStack(spacing: 4) {
+                Spacer()
+                Text("적음").font(.system(size: 10)).foregroundStyle(.secondary)
+                ForEach([0.08, 0.25, 0.45, 0.65, 0.85, 1.0], id: \.self) { opacity in
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(opacity == 0.08 ? Color.secondary.opacity(0.08) : Color.green.opacity(opacity))
+                        .frame(width: 12, height: 12)
+                }
+                Text("많음").font(.system(size: 10)).foregroundStyle(.secondary)
+            }
+        }
     }
 }
 
@@ -197,12 +317,12 @@ struct MonthCalendarView: View {
                                     RoundedRectangle(cornerRadius: 6)
                                         .fill(s > 0 ? heatColor(date) : Color.secondary.opacity(0.06))
                                     RoundedRectangle(cornerRadius: 6)
-                                        .strokeBorder(isSelected ? Color.blue : Color.clear, lineWidth: 2)
+                                        .strokeBorder(isSelected ? Color.ghGreen : Color.clear, lineWidth: 2)
 
                                     VStack(spacing: 2) {
                                         Text("\(cal.component(.day, from: date))")
                                             .font(.system(size: 12, weight: isToday ? .bold : .regular))
-                                            .foregroundStyle(isToday ? Color.blue : Color.primary)
+                                            .foregroundStyle(isToday ? Color.ghGreen : Color.primary)
                                         if s > 0 {
                                             Text(shortTime(s))
                                                 .font(.system(size: 10, weight: .semibold))
@@ -275,7 +395,7 @@ struct DailyStatsView: View {
                             innerRadius: .ratio(0.58),
                             angularInset: 1.5
                         )
-                        .foregroundStyle(Color(hex: proj.colorHex) ?? .blue)
+                        .foregroundStyle(Color(hex: proj.colorHex) ?? .ghGreen)
                         .cornerRadius(3)
                     }
                     .frame(width: 110, height: 110)
@@ -284,7 +404,7 @@ struct DailyStatsView: View {
                         ForEach(breakdown, id: \.0.id) { proj, secs in
                             HStack(spacing: 8) {
                                 RoundedRectangle(cornerRadius: 2)
-                                    .fill(Color(hex: proj.colorHex) ?? .blue)
+                                    .fill(Color(hex: proj.colorHex) ?? .ghGreen)
                                     .frame(width: 4, height: 18)
                                 Text(proj.name).font(.system(size: 13)).lineLimit(1)
                                 Spacer()
@@ -344,7 +464,7 @@ struct TimeBlockChart: View {
         allEntries.compactMap { entry in
             guard cal.isDate(entry.startedAt, inSameDayAs: date) else { return nil }
             let hex = entry.task?.project?.colorHex ?? "8E8E93"
-            return (entry, Color(hex: hex) ?? .blue)
+            return (entry, Color(hex: hex) ?? .ghGreen)
         }
     }
 
@@ -502,14 +622,14 @@ struct WeeklyStatsView: View {
                     Text("과목별").font(.system(size: 15, weight: .semibold))
                     ForEach(breakdown, id: \.0.id) { proj, secs in
                         HStack(spacing: 10) {
-                            Circle().fill(Color(hex: proj.colorHex) ?? .blue).frame(width: 10, height: 10)
+                            Circle().fill(Color(hex: proj.colorHex) ?? .ghGreen).frame(width: 10, height: 10)
                             Text(proj.name).font(.system(size: 14))
                             Spacer()
                             GeometryReader { geo in
                                 ZStack(alignment: .leading) {
                                     RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.12)).frame(height: 5)
                                     RoundedRectangle(cornerRadius: 3)
-                                        .fill(Color(hex: proj.colorHex) ?? .blue)
+                                        .fill(Color(hex: proj.colorHex) ?? .ghGreen)
                                         .frame(width: geo.size.width * (totalWeek > 0 ? Double(secs)/Double(totalWeek) : 0), height: 5)
                                 }
                                 .frame(maxHeight: .infinity)
@@ -587,7 +707,7 @@ struct MonthlyStatsView: View {
                             innerRadius: .ratio(0.58),
                             angularInset: 1.5
                         )
-                        .foregroundStyle(Color(hex: proj.colorHex) ?? .blue)
+                        .foregroundStyle(Color(hex: proj.colorHex) ?? .ghGreen)
                         .cornerRadius(3)
                     }
                     .frame(width: 110, height: 110)
@@ -596,7 +716,7 @@ struct MonthlyStatsView: View {
                         ForEach(breakdown, id: \.0.id) { proj, secs in
                             HStack(spacing: 8) {
                                 RoundedRectangle(cornerRadius: 2)
-                                    .fill(Color(hex: proj.colorHex) ?? .blue)
+                                    .fill(Color(hex: proj.colorHex) ?? .ghGreen)
                                     .frame(width: 4, height: 18)
                                 Text(proj.name).font(.system(size: 13)).lineLimit(1)
                                 Spacer()

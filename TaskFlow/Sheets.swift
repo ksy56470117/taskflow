@@ -52,7 +52,7 @@ struct AddAreaSheet: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(name.isEmpty ? Color.secondary : Color.white)
                         .frame(width: 26, height: 26)
-                        .background(name.isEmpty ? Color.secondary.opacity(0.12) : Color.blue)
+                        .background(name.isEmpty ? Color.secondary.opacity(0.12) : Color.ghGreen)
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -103,7 +103,7 @@ struct AddProjectSheet: View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Circle()
-                    .fill(Color(hex: selectedColor) ?? .blue)
+                    .fill(Color(hex: selectedColor) ?? .ghGreen)
                     .frame(width: 10, height: 10)
 
                 ZStack(alignment: .leading) {
@@ -139,7 +139,7 @@ struct AddProjectSheet: View {
                 ForEach(presets, id: \.self) { hex in
                     ZStack {
                         Circle()
-                            .fill(Color(hex: hex) ?? .blue)
+                            .fill(Color(hex: hex) ?? .ghGreen)
                             .frame(width: 17, height: 17)
                         if selectedColor == hex {
                             Image(systemName: "checkmark")
@@ -176,7 +176,7 @@ struct AddProjectSheet: View {
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(name.isEmpty ? Color.secondary : Color.white)
                         .frame(width: 22, height: 22)
-                        .background(name.isEmpty ? Color.secondary.opacity(0.12) : Color.blue)
+                        .background(name.isEmpty ? Color.secondary.opacity(0.12) : Color.ghGreen)
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -200,6 +200,9 @@ struct AddProjectSheet: View {
             area.projects.append(project)
         }
         modelContext.insert(project)
+        // 프로젝트명과 동일한 태그 자동 생성
+        let tag = Tag(name: name, colorHex: selectedColor)
+        modelContext.insert(tag)
         try? modelContext.save()
         dismiss()
     }
@@ -213,13 +216,23 @@ struct AddTaskSheet: View {
 
     var project: Project
 
+    @Query(sort: \Tag.name) private var existingTags: [Tag]
+
     @State private var title = ""
     @State private var notes = ""
     @State private var hasDueDate = false
     @State private var dueDate = Date()
     @State private var showDatePicker = false
+    @State private var tagInput = ""
+    @State private var selectedTags: [Tag] = []
 
-    var projColor: Color { Color(hex: project.colorHex) ?? .blue }
+    var projColor: Color { Color(hex: project.colorHex) ?? .ghGreen }
+
+    var tagSuggestions: [Tag] {
+        guard !tagInput.isEmpty else { return [] }
+        let q = tagInput.lowercased()
+        return existingTags.filter { tag in tag.name.lowercased().contains(q) && !selectedTags.contains(where: { s in s.id == tag.id }) }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -252,6 +265,61 @@ struct AddTaskSheet: View {
                             .font(.system(size: 13))
                             .textFieldStyle(.plain)
                             .foregroundStyle(.secondary)
+                    }
+
+                    // 태그 입력
+                    HStack(spacing: 4) {
+                        Image(systemName: "tag")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                        // 선택된 태그 표시
+                        ForEach(selectedTags) { tag in
+                            HStack(spacing: 2) {
+                                Text(tag.name)
+                                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                Button {
+                                    selectedTags.removeAll { $0.id == tag.id }
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 7, weight: .bold))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .foregroundStyle(Color(hex: tag.colorHex) ?? Color.ghGreen)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background((Color(hex: tag.colorHex) ?? Color.ghGreen).opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                        TextField("태그 추가", text: $tagInput)
+                            .font(.system(size: 12, design: .monospaced))
+                            .textFieldStyle(.plain)
+                            .onSubmit {
+                                addTagFromInput()
+                            }
+                    }
+
+                    // 태그 자동완성 목록
+                    if !tagSuggestions.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 4) {
+                                ForEach(tagSuggestions) { tag in
+                                    Button {
+                                        selectedTags.append(tag)
+                                        tagInput = ""
+                                    } label: {
+                                        Text(tag.name)
+                                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                            .foregroundStyle(Color(hex: tag.colorHex) ?? Color.ghGreen)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background((Color(hex: tag.colorHex) ?? Color.ghGreen).opacity(0.08))
+                                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -300,9 +368,9 @@ struct AddTaskSheet: View {
                         Image(systemName: "calendar").font(.system(size: 12))
                         if hasDueDate { Text(formatDate(dueDate)).font(.system(size: 12, weight: .medium)) }
                     }
-                    .foregroundStyle(hasDueDate ? Color.blue : Color.secondary)
+                    .foregroundStyle(hasDueDate ? Color.ghGreen : Color.secondary)
                     .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(hasDueDate ? Color.blue.opacity(0.1) : Color.clear).clipShape(Capsule())
+                    .background(hasDueDate ? Color.ghGreen.opacity(0.1) : Color.clear).clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
 
@@ -313,7 +381,7 @@ struct AddTaskSheet: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(title.isEmpty ? Color.secondary : Color.white)
                         .frame(width: 26, height: 26)
-                        .background(title.isEmpty ? Color.secondary.opacity(0.12) : Color.blue)
+                        .background(title.isEmpty ? Color.secondary.opacity(0.12) : Color.ghGreen)
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -328,10 +396,43 @@ struct AddTaskSheet: View {
         .onAppear { titleFocused = true }
     }
 
+    func addTagFromInput() {
+        let name = tagInput.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        // 기존 태그 찾기
+        if let existing = existingTags.first(where: { $0.name.lowercased() == name.lowercased() }) {
+            if !selectedTags.contains(where: { $0.id == existing.id }) {
+                selectedTags.append(existing)
+            }
+        } else {
+            // 새 태그 생성
+            let newTag = Tag(name: name, colorHex: project.colorHex)
+            modelContext.insert(newTag)
+            selectedTags.append(newTag)
+        }
+        tagInput = ""
+    }
+
     func submit() {
         guard !title.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         let finalDueDate = hasDueDate ? dueDate : nil
         let task = Task(title: title, notes: notes, project: project, dueDate: finalDueDate)
+        // 프로젝트 태그 자동 적용
+        let descriptor = FetchDescriptor<Tag>()
+        let allTags = (try? modelContext.fetch(descriptor)) ?? []
+        if let tag = allTags.first(where: { $0.name == project.name }) {
+            task.tags.append(tag)
+        } else {
+            let tag = Tag(name: project.name, colorHex: project.colorHex)
+            modelContext.insert(tag)
+            task.tags.append(tag)
+        }
+        // 직접 선택/입력한 태그 추가
+        for tag in selectedTags {
+            if !task.tags.contains(where: { $0.id == tag.id }) {
+                task.tags.append(tag)
+            }
+        }
         project.tasks.append(task)
         modelContext.insert(task)
         try? modelContext.save()

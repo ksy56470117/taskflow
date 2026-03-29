@@ -11,7 +11,11 @@ struct TaskFlowApp: App {
             StudyPlan.self, StudySession.self, SchoolEvent.self,
             WishItem.self, Transaction.self, MonthlyBudget.self,
             SavingsAccount.self, SavingsPayment.self,
-            ScheduledTransaction.self
+            ScheduledTransaction.self,
+            NoteDocument.self, NoteFolder.self, NoteBlock.self,
+            SpreadsheetCell.self, MindMapNode.self,
+            WeeklySchedule.self, ScheduleTask.self,
+            Tag.self
         ])
         let storeURL = Self.resolveStoreURL()
         let config = ModelConfiguration(schema: schema, url: storeURL)
@@ -29,6 +33,9 @@ struct TaskFlowApp: App {
             try? ctx.save()
             UserDefaults.standard.set(true, forKey: "didSeedSchoolArea")
         }
+
+        // 시간표 시드 제거됨 — 사용자가 직접 입력
+
     }
 
     static func resolveStoreURL() -> URL {
@@ -49,6 +56,7 @@ struct TaskFlowApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .tint(Color.ghGreen)
         }
         .modelContainer(container)
     }

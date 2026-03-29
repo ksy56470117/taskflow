@@ -3,15 +3,14 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @State private var timerManager = TimerManager()
     @State private var showAddProject = false
     @State private var showAddTask: Project? = nil
 
     var body: some View {
 #if os(macOS)
-        MacContentView(timerManager: timerManager)
+        MacContentView()
 #else
-        iOSContentView(timerManager: timerManager, showAddProject: $showAddProject, showAddTask: $showAddTask)
+        iOSContentView(showAddProject: $showAddProject, showAddTask: $showAddTask)
 #endif
     }
 }
@@ -20,7 +19,6 @@ struct ContentView: View {
 #if os(iOS)
 struct iOSContentView: View {
     @Environment(\.modelContext) private var modelContext
-    var timerManager: TimerManager
     @Binding var showAddProject: Bool
     @Binding var showAddTask: Project?
     @State private var selectedTab = 0
@@ -28,33 +26,44 @@ struct iOSContentView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
-                TodayView(timerManager: timerManager, showAddTask: $showAddTask)
+                TodayView(showAddTask: $showAddTask)
                     .navigationTitle("오늘")
                     .navigationBarTitleDisplayMode(.large)
             }
-            .tabItem { Label("오늘", systemImage: "star") }.tag(0)
+            .tabItem { Label("오늘", systemImage: "house.fill") }.tag(0)
+
+            NavigationStack {
+                UpcomingView().navigationTitle("Upcoming").navigationBarTitleDisplayMode(.large)
+            }
+            .tabItem { Label("Upcoming", systemImage: "clock") }.tag(1)
+
+            NavigationStack {
+                CalendarView()
+                    .navigationBarHidden(true)
+            }
+            .tabItem { Label("캘린더", systemImage: "square.grid.2x2") }.tag(2)
 
             NavigationStack {
                 StatsView().navigationTitle("통계").navigationBarTitleDisplayMode(.large)
             }
-            .tabItem { Label("통계", systemImage: "chart.bar") }.tag(1)
-
-            NavigationStack {
-                CalendarView().navigationTitle("캘린더").navigationBarTitleDisplayMode(.large)
-            }
-            .tabItem { Label("캘린더", systemImage: "calendar") }.tag(2)
+            .tabItem { Label("통계", systemImage: "chart.line.uptrend.xyaxis") }.tag(3)
 
             NavigationStack {
                 SpendingView()
             }
-            .tabItem { Label("가계부", systemImage: "wonsign.circle") }.tag(3)
+            .tabItem { Label("가계부", systemImage: "creditcard") }.tag(4)
 
             NavigationStack {
                 WishlistView()
             }
-            .tabItem { Label("위시리스트", systemImage: "heart") }.tag(4)
+            .tabItem { Label("위시리스트", systemImage: "gift") }.tag(5)
+
+            NavigationStack {
+                WeeklyScheduleView()
+            }
+            .tabItem { Label("시간표", systemImage: "tablecells") }.tag(6)
+
         }
-        .onAppear { timerManager.setup(context: modelContext) }
     }
 }
 #endif
@@ -65,9 +74,10 @@ struct MacContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var areas: [Area]
     @Query private var projects: [Project]
-    var timerManager: TimerManager
+    // noteDocuments query removed
 
     @State private var selection: SidebarItem? = .today
+    @State private var sidebarTapCount = 0
     @State private var showAddArea = false
     @State private var showAddProject: Area? = nil
 
@@ -76,13 +86,20 @@ struct MacContentView: View {
             ThingsSidebar(
                 selection: $selection,
                 showAddArea: $showAddArea,
-                showAddProject: $showAddProject
+                showAddProject: $showAddProject,
+                onTap: { item in
+                    selection = item
+                    sidebarTapCount += 1
+                }
             )
+            .navigationSplitViewColumnWidth(min: 160, ideal: 175, max: 200)
         } detail: {
             Group {
                 switch selection {
                 case .today:
-                    TodayView(timerManager: timerManager, showAddTask: .constant(nil))
+                    TodayView(showAddTask: .constant(nil))
+                case .upcoming:
+                    UpcomingView()
                 case .stats:
                     StatsView()
                 case .calendar:
@@ -93,147 +110,302 @@ struct MacContentView: View {
                     SpendingView()
                 case .wishlist:
                     WishlistView()
+                case .weeklySchedule:
+                    WeeklyScheduleView()
                 case .project(let id):
                     if let project = projects.first(where: { $0.id == id }) {
-                        ProjectDetailView(project: project, timerManager: timerManager)
+                        ProjectDetailView(project: project)
                             .id(project.id)
                     }
                 case .area(let id):
                     if let area = areas.first(where: { $0.id == id }) {
-                        AreaDetailView(area: area, timerManager: timerManager)
+                        AreaDetailView(area: area)
                     }
                 case .none:
-                    TodayView(timerManager: timerManager, showAddTask: .constant(nil))
+                    TodayView(showAddTask: .constant(nil))
                 }
             }
+            .id(sidebarTapCount)
         }
-        .onAppear { timerManager.setup(context: modelContext) }
         .navigationSplitViewStyle(.balanced)
         .sheet(isPresented: $showAddArea) { AddAreaSheet() }
         .sheet(item: $showAddProject) { AddProjectSheet(area: $0) }
     }
+
 }
 
 // MARK: - Sidebar Item
 enum SidebarItem: Hashable {
-    case today, stats, calendar, studyPlan, spending, wishlist
+    case today, upcoming, stats, calendar, studyPlan, spending, wishlist, weeklySchedule
     case area(UUID)
     case project(UUID)
+    // noteDocument case removed
 }
 
 // MARK: - Sidebar
 struct ThingsSidebar: View {
+    @Environment(\.modelContext) private var modelContext
     @Query private var areas: [Area]
     @Query(filter: #Predicate<Project> { $0.area == nil }) private var looseProjects: [Project]
     @Binding var selection: SidebarItem?
     @Binding var showAddArea: Bool
     @Binding var showAddProject: Area?
+    var onTap: ((SidebarItem) -> Void)? = nil
+    @State private var editingArea: Area? = nil
+    @State private var editingProject: Project? = nil
+    @State private var editName: String = ""
+    @State private var editColorHex: String = "007AFF"
 
     var body: some View {
         List(selection: $selection) {
-            // 스마트 리스트
-            Section {
-                Label("오늘", systemImage: "star.fill")
-                    .foregroundStyle(.primary)
+            // LIFE
+            Section(content: {
+                Label("오늘", systemImage: "house.fill")
+                    .font(.system(size: 12)).foregroundStyle(.primary).lineLimit(1)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                     .tag(SidebarItem.today)
-                Label("통계", systemImage: "chart.bar.fill")
-                    .foregroundStyle(.primary)
-                    .tag(SidebarItem.stats)
-                Label("캘린더", systemImage: "calendar")
-                    .foregroundStyle(.primary)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.today) })
+                Label("Upcoming", systemImage: "clock")
+                    .font(.system(size: 12)).foregroundStyle(.primary).lineLimit(1)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
+                    .tag(SidebarItem.upcoming)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.upcoming) })
+                Label("캘린더", systemImage: "square.grid.2x2")
+                    .font(.system(size: 12)).foregroundStyle(.primary).lineLimit(1)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                     .tag(SidebarItem.calendar)
-                Label("학습 계획", systemImage: "books.vertical.fill")
-                    .foregroundStyle(.primary)
-                    .tag(SidebarItem.studyPlan)
-                Label("가계부", systemImage: "wonsign.circle.fill")
-                    .foregroundStyle(.primary)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.calendar) })
+                Label("가계부", systemImage: "creditcard.fill")
+                    .font(.system(size: 12)).foregroundStyle(.primary).lineLimit(1)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                     .tag(SidebarItem.spending)
-                Label("위시리스트", systemImage: "heart")
-                    .foregroundStyle(.primary)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.spending) })
+                Label("위시리스트", systemImage: "gift")
+                    .font(.system(size: 12)).foregroundStyle(.primary).lineLimit(1)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                     .tag(SidebarItem.wishlist)
-            }
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.wishlist) })
+            }, header: {
+                Text("Life").font(.system(size: 10, weight: .semibold)).padding(.leading, 10)
+            })
+
+            // STUDY
+            Section(content: {
+                Label("통계", systemImage: "chart.line.uptrend.xyaxis")
+                    .font(.system(size: 12)).foregroundStyle(.primary).lineLimit(1)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
+                    .tag(SidebarItem.stats)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.stats) })
+                Label("학습 계획", systemImage: "text.book.closed.fill")
+                    .font(.system(size: 12)).foregroundStyle(.primary).lineLimit(1)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
+                    .tag(SidebarItem.studyPlan)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.studyPlan) })
+                Label("시간표", systemImage: "tablecells")
+                    .font(.system(size: 12)).foregroundStyle(.primary).lineLimit(1)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
+                    .tag(SidebarItem.weeklySchedule)
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.weeklySchedule) })
+            }, header: {
+                Text("Study").font(.system(size: 10, weight: .semibold)).padding(.leading, 10)
+            })
 
             // Area별 프로젝트
             ForEach(areas.sorted { $0.order < $1.order }) { area in
-                Section {
+                Section(content: {
                     // Area 행
                     HStack(spacing: 8) {
-                        Image(systemName: "tray.2")
-                            .font(.system(size: 13))
+                        Image(systemName: "building.2")
+                            .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                         Text(area.name)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(.primary)
                         Spacer()
                         Button {
                             showAddProject = area
                         } label: {
                             Image(systemName: "plus")
-                                .font(.system(size: 11))
+                                .font(.system(size: 10))
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
                     }
+                    .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                     .tag(SidebarItem.area(area.id))
+                    .simultaneousGesture(TapGesture().onEnded { onTap?(.area(area.id)) })
+                    .contextMenu {
+                        Button {
+                            editName = area.name
+                            editingArea = area
+                        } label: {
+                            Label("이름 변경", systemImage: "pencil")
+                        }
+                        Button { showAddProject = area } label: {
+                            Label("프로젝트 추가", systemImage: "plus.circle")
+                        }
+                        Divider()
+                        Button(role: .destructive) {
+                            // 하위 프로젝트도 함께 삭제
+                            for proj in area.projects { modelContext.delete(proj) }
+                            modelContext.delete(area)
+                            try? modelContext.save()
+                            if selection == .area(area.id) { selection = .today }
+                        } label: {
+                            Label("삭제", systemImage: "trash")
+                        }
+                    }
 
                     // 하위 프로젝트
                     ForEach(area.projects.sorted { $0.order < $1.order }) { project in
                         HStack(spacing: 8) {
-                            Image(systemName: "folder.fill")
-                                .font(.system(size: 11))
-                                .foregroundStyle(Color(hex: project.colorHex) ?? .blue)
+                            Image(systemName: "book.closed.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Color(hex: project.colorHex) ?? .ghGreen)
                                 .padding(.leading, 8)
                             Text(project.name)
-                                .font(.system(size: 13))
+                                .font(.system(size: 12))
                                 .lineLimit(1)
                             Spacer()
                             let pending = project.pendingCount
                             if pending > 0 {
                                 Text("\(pending)")
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 11))
                                     .foregroundStyle(.secondary)
                             }
                         }
+                        .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                         .tag(SidebarItem.project(project.id))
+                        .simultaneousGesture(TapGesture().onEnded { onTap?(.project(project.id)) })
+                        .contextMenu {
+                            Button {
+                                editName = project.name
+                                editColorHex = project.colorHex
+                                editingProject = project
+                            } label: {
+                                Label("편집", systemImage: "pencil")
+                            }
+                            Divider()
+                            Button(role: .destructive) {
+                                modelContext.delete(project)
+                                try? modelContext.save()
+                                if selection == .project(project.id) { selection = .today }
+                            } label: {
+                                Label("삭제", systemImage: "trash")
+                            }
+                        }
                     }
-                }
+                })
             }
 
             // Area 없는 프로젝트
             if !looseProjects.isEmpty {
-                Section("프로젝트") {
+                Section(content: {
                     ForEach(looseProjects) { project in
                         HStack(spacing: 8) {
-                            Image(systemName: "folder.fill")
-                                .font(.system(size: 11))
-                                .foregroundStyle(Color(hex: project.colorHex) ?? .blue)
-                            Text(project.name).font(.system(size: 13)).lineLimit(1)
+                            Image(systemName: "book.closed.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Color(hex: project.colorHex) ?? .ghGreen)
+                            Text(project.name).font(.system(size: 12)).lineLimit(1)
                             Spacer()
                             let pending = project.pendingCount
                             if pending > 0 {
-                                Text("\(pending)").font(.system(size: 12)).foregroundStyle(.secondary)
+                                Text("\(pending)").font(.system(size: 11)).foregroundStyle(.secondary)
                             }
                         }
+                        .listRowInsets(EdgeInsets(top: 2, leading: 18, bottom: 2, trailing: 6))
                         .tag(SidebarItem.project(project.id))
+                        .simultaneousGesture(TapGesture().onEnded { onTap?(.project(project.id)) })
+                        .contextMenu {
+                            Button {
+                                editName = project.name
+                                editColorHex = project.colorHex
+                                editingProject = project
+                            } label: {
+                                Label("편집", systemImage: "pencil")
+                            }
+                            Divider()
+                            Button(role: .destructive) {
+                                modelContext.delete(project)
+                                try? modelContext.save()
+                                if selection == .project(project.id) { selection = .today }
+                            } label: {
+                                Label("삭제", systemImage: "trash")
+                            }
+                        }
                     }
-                }
+                }, header: {
+                    Text("프로젝트").font(.system(size: 10, weight: .semibold)).padding(.leading, 10)
+                })
             }
         }
         .listStyle(.sidebar)
         .frame(minWidth: 220)
+        // Area 이름 편집 sheet
+        .sheet(item: $editingArea) { area in
+            NavigationStack {
+                Form {
+                    TextField("Area 이름", text: $editName)
+                }
+                .navigationTitle("Area 편집")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("취소") { editingArea = nil } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("저장") {
+                            area.name = editName
+                            try? modelContext.save()
+                            editingArea = nil
+                        }
+                    }
+                }
+            }
+            .frame(minWidth: 300, minHeight: 150)
+        }
+        // 프로젝트 편집 sheet
+        .sheet(item: $editingProject) { project in
+            NavigationStack {
+                Form {
+                    TextField("프로젝트 이름", text: $editName)
+                    Section("색상") {
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8), spacing: 8) {
+                            ForEach(["007AFF","EF4444","F97316","EAB308","22C55E","06B6D4","8B5CF6","EC4899"], id: \.self) { hex in
+                                Circle()
+                                    .fill(Color(hex: hex) ?? .ghGreen)
+                                    .frame(width: 24, height: 24)
+                                    .overlay(Circle().stroke(Color.primary, lineWidth: editColorHex == hex ? 2 : 0))
+                                    .onTapGesture { editColorHex = hex }
+                            }
+                        }
+                    }
+                }
+                .navigationTitle("프로젝트 편집")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("취소") { editingProject = nil } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("저장") {
+                            project.name = editName
+                            project.colorHex = editColorHex
+                            try? modelContext.save()
+                            editingProject = nil
+                        }
+                    }
+                }
+            }
+            .frame(minWidth: 320, minHeight: 220)
+        }
         .safeAreaInset(edge: .bottom) {
             HStack {
                 Button {
                     showAddArea = true
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "plus").font(.system(size: 12, weight: .medium))
-                        Text("새 Area").font(.system(size: 13))
+                        Image(systemName: "plus").font(.system(size: 11, weight: .medium))
+                        Text("새 Area").font(.system(size: 12))
                     }
                     .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .padding(.horizontal, 16)
+                .padding(.leading, 18).padding(.trailing, 8)
                 .padding(.vertical, 12)
                 Spacer()
             }
@@ -247,7 +419,6 @@ struct ThingsSidebar: View {
 struct AreaDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var area: Area
-    var timerManager: TimerManager
     @State private var showAddProject = false
     @Query private var allEvents: [SchoolEvent]
 
@@ -263,7 +434,7 @@ struct AreaDetailView: View {
                 // 헤더
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 10) {
-                        Image(systemName: "tray.2.fill")
+                        Image(systemName: "building.2.fill")
                             .font(.system(size: 24))
                             .foregroundStyle(.secondary)
                         Text(area.name)
@@ -300,7 +471,7 @@ struct AreaDetailView: View {
                 ForEach(area.projects.sorted { $0.order < $1.order }) { project in
                     HStack(spacing: 12) {
                         Circle()
-                            .fill(Color(hex: project.colorHex) ?? .blue)
+                            .fill(Color(hex: project.colorHex) ?? .ghGreen)
                             .frame(width: 10, height: 10)
                         Text(project.name).font(.system(size: 15))
                         Spacer()
@@ -394,7 +565,7 @@ struct SchoolEventRow: View {
         switch event.type {
         case "midterm": return .orange
         case "final":   return .red
-        default:        return .blue
+        default:        return .ghGreen
         }
     }
 
@@ -489,7 +660,7 @@ struct AddSchoolEventSheet: View {
                                         .font(.system(size: 13))
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 6)
-                                        .background(title == name ? Color.blue.opacity(0.15) : Color.secondary.opacity(0.1))
+                                        .background(title == name ? Color.ghGreen.opacity(0.15) : Color.secondary.opacity(0.1))
                                         .clipShape(Capsule())
                                 }
                                 .buttonStyle(.plain)
@@ -686,15 +857,13 @@ struct ExamDateRow: View {
 struct ProjectDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var project: Project
-    var timerManager: TimerManager
-
     @State private var newTaskTitle = ""
     @State private var isAddingTask = false
     @State private var selectedTask: Task? = nil
 
     var pendingTasks: [Task] { project.tasks.filter { !$0.isCompleted } }
     var completedTasks: [Task] { project.tasks.filter { $0.isCompleted } }
-    var projColor: Color { Color(hex: project.colorHex) ?? .blue }
+    var projColor: Color { Color(hex: project.colorHex) ?? .ghGreen }
     var isSchoolProject: Bool { project.area?.name == "학교" }
 
     var body: some View {
@@ -704,19 +873,19 @@ struct ProjectDetailView: View {
                 // 프로젝트 헤더
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 10) {
-                        Image(systemName: "folder.fill")
+                        Image(systemName: "book.closed.fill")
                             .font(.system(size: 20))
                             .foregroundStyle(projColor)
                         Text(project.name)
-                            .font(.system(size: 26, weight: .bold))
+                            .font(.system(size: 24, weight: .bold))
                     }
 
-                    // Notes
-                    TextField("Notes", text: Binding(
+                    // 프로젝트 메모
+                    TextField("메모", text: Binding(
                         get: { project.notes },
                         set: { project.notes = $0; try? modelContext.save() }
                     ), axis: .vertical)
-                    .font(.system(size: 14))
+                    .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .textFieldStyle(.plain)
                 }
@@ -738,7 +907,6 @@ struct ProjectDetailView: View {
                         ThingsTaskRow(
                             task: task,
                             project: project,
-                            timerManager: timerManager,
                             isSelected: selectedTask?.id == task.id,
                             onSelect: { selectedTask = selectedTask?.id == task.id ? nil : task }
                         )
@@ -749,21 +917,21 @@ struct ProjectDetailView: View {
                         HStack(spacing: 14) {
                             Circle()
                                 .strokeBorder(projColor, lineWidth: 1.5)
-                                .frame(width: 22, height: 22)
+                                .frame(width: 20, height: 20)
                             TextField("새 태스크", text: $newTaskTitle)
-                                .font(.system(size: 14))
+                                .font(.system(size: 13))
                                 .textFieldStyle(.plain)
                                 .onSubmit { submitNewTask() }
                             Spacer()
                             Button { isAddingTask = false } label: {
                                 Image(systemName: "xmark")
-                                    .font(.system(size: 11))
+                                    .font(.system(size: 10))
                                     .foregroundStyle(.secondary)
                             }
                             .buttonStyle(.plain)
                         }
                         .padding(.horizontal, 32)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, 9)
                     }
                 }
 
@@ -771,19 +939,18 @@ struct ProjectDetailView: View {
                 if !completedTasks.isEmpty {
                     HStack {
                         Text("완료됨")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.secondary)
                         Spacer()
                     }
                     .padding(.horizontal, 32)
-                    .padding(.top, 20)
-                    .padding(.bottom, 6)
+                    .padding(.top, 18)
+                    .padding(.bottom, 5)
 
                     ForEach(completedTasks) { task in
                         ThingsTaskRow(
                             task: task,
                             project: project,
-                            timerManager: timerManager,
                             isSelected: false,
                             onSelect: { }
                         )
@@ -808,17 +975,6 @@ struct ProjectDetailView: View {
                 .buttonStyle(.plain)
                 .padding(.leading, 32)
                 Spacer()
-
-                // 실행 중 타이머
-                if timerManager.activeEntry != nil {
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.green).frame(width: 6, height: 6)
-                        Text(timerManager.clockString)
-                            .font(.system(size: 13, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.green)
-                    }
-                    .padding(.trailing, 20)
-                }
             }
             .padding(.vertical, 12)
             .background(.bar)
@@ -832,6 +988,16 @@ struct ProjectDetailView: View {
             return
         }
         let task = Task(title: newTaskTitle, project: project)
+        // 프로젝트 태그 자동 적용
+        let descriptor = FetchDescriptor<Tag>()
+        let allTags = (try? modelContext.fetch(descriptor)) ?? []
+        if let tag = allTags.first(where: { $0.name == project.name }) {
+            task.tags.append(tag)
+        } else {
+            let tag = Tag(name: project.name, colorHex: project.colorHex)
+            modelContext.insert(tag)
+            task.tags.append(tag)
+        }
         project.tasks.append(task)
         modelContext.insert(task)
         try? modelContext.save()
@@ -839,17 +1005,19 @@ struct ProjectDetailView: View {
     }
 }
 
+
+
 // MARK: - Things Task Row
 struct ThingsTaskRow: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var task: Task
     var project: Project
-    var timerManager: TimerManager
     var isSelected: Bool
     var onSelect: () -> Void
+    @State private var showEdit = false
+    @State private var showDeleteAlert = false
 
-    var isRunning: Bool { timerManager.isRunning(task: task) }
-    var projColor: Color { Color(hex: project.colorHex) ?? .blue }
+    var projColor: Color { Color(hex: project.colorHex) ?? .ghGreen }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -858,7 +1026,6 @@ struct ThingsTaskRow: View {
                 Button {
                     withAnimation(.spring(duration: 0.2)) {
                         task.isCompleted.toggle()
-                        if task.isCompleted && isRunning { timerManager.stop() }
                         try? modelContext.save()
                     }
                 } label: {
@@ -879,7 +1046,7 @@ struct ThingsTaskRow: View {
                 // 제목 + 서브텍스트 — 클릭하면 펼치기
                 VStack(alignment: .leading, spacing: 3) {
                     Text(task.title)
-                        .font(.system(size: 15))
+                        .font(.system(size: 13))
                         .foregroundStyle(task.isCompleted ? Color.secondary : Color.primary)
                         .strikethrough(task.isCompleted, color: Color.secondary.opacity(0.5))
 
@@ -906,23 +1073,9 @@ struct ThingsTaskRow: View {
                     if !task.isCompleted { onSelect() }
                 }
 
-                // 타이머
-                if !task.isCompleted {
-                    Button {
-                        isRunning ? timerManager.stop() : timerManager.start(task: task)
-                    } label: {
-                        Image(systemName: isRunning ? "pause.fill" : "play.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(isRunning ? Color.green : Color.secondary.opacity(0.4))
-                            .frame(width: 24, height: 24)
-                            .background(isRunning ? Color.green.opacity(0.1) : Color.clear)
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                }
             }
             .padding(.horizontal, 32)
-            .padding(.vertical, 13)
+            .padding(.vertical, 6)
 
             // 선택 시 인라인 상세 — Things 3 스타일
             if isSelected {
@@ -953,6 +1106,36 @@ struct ThingsTaskRow: View {
 
             Divider().padding(.leading, 68)
         }
+        .contextMenu {
+            Button {
+                showEdit = true
+            } label: {
+                Label("편집", systemImage: "pencil")
+            }
+            Button {
+                task.isCompleted.toggle()
+                try? modelContext.save()
+            } label: {
+                Label(task.isCompleted ? "미완료로 표시" : "완료로 표시",
+                      systemImage: task.isCompleted ? "circle" : "checkmark.circle")
+            }
+            Divider()
+            Button(role: .destructive) {
+                showDeleteAlert = true
+            } label: {
+                Label("삭제", systemImage: "trash")
+            }
+        }
+        .sheet(isPresented: $showEdit) {
+            TaskEditSheet(task: task)
+        }
+        .alert("태스크를 삭제할까요?", isPresented: $showDeleteAlert) {
+            Button("삭제", role: .destructive) {
+                modelContext.delete(task)
+                try? modelContext.save()
+            }
+            Button("취소", role: .cancel) {}
+        }
     }
 
     func formatDate(_ d: Date) -> String {
@@ -979,10 +1162,10 @@ struct WhenButton: View {
                 Text(task.dueDate.map { formatDate($0) } ?? "When")
                     .font(.system(size: 12))
             }
-            .foregroundStyle(task.dueDate != nil ? Color.blue : Color.secondary)
+            .foregroundStyle(task.dueDate != nil ? Color.ghGreen : Color.secondary)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(task.dueDate != nil ? Color.blue.opacity(0.08) : Color.secondary.opacity(0.08))
+            .background(task.dueDate != nil ? Color.ghGreen.opacity(0.08) : Color.secondary.opacity(0.08))
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)

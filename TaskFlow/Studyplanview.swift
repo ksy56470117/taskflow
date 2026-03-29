@@ -70,7 +70,7 @@ struct StudyPlanRow: View {
                 ProgressView(value: plan.progressRatio)
                     .progressViewStyle(.linear)
                     .frame(width: 80)
-                    .tint(.blue)
+                    .tint(Color.ghGreen)
                 Text("\(plan.completedUnits)/\(plan.totalUnits)\(plan.unitType)")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
@@ -120,7 +120,7 @@ struct StudyPlanDetailView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "books.vertical.fill")
                             .font(.system(size: 22))
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(Color.ghGreen)
                         Text(plan.title)
                             .font(.system(size: 26, weight: .bold))
                     }
@@ -134,11 +134,11 @@ struct StudyPlanDetailView: View {
                             Spacer()
                             Text("\(Int(plan.progressRatio * 100))%")
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(Color.ghGreen)
                         }
                         ProgressView(value: plan.progressRatio)
                             .progressViewStyle(.linear)
-                            .tint(.blue)
+                            .tint(Color.ghGreen)
                     }
 
                     // 기간
@@ -160,7 +160,7 @@ struct StudyPlanDetailView: View {
                     VStack(spacing: 16) {
                         Image(systemName: "wand.and.stars")
                             .font(.system(size: 36))
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(Color.ghGreen)
                         Text("AI가 최적의 학습 스케줄을 만들어드릴게요")
                             .font(.system(size: 15))
                             .foregroundStyle(.secondary)
@@ -188,7 +188,7 @@ struct StudyPlanDetailView: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 24)
                             .padding(.vertical, 12)
-                            .background(isGenerating ? Color.secondary : Color.blue)
+                            .background(isGenerating ? Color.secondary : Color.ghGreen)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                         .buttonStyle(.plain)
@@ -397,10 +397,10 @@ struct SessionRow: View {
             } label: {
                 ZStack {
                     Circle()
-                        .strokeBorder(session.isCompleted ? Color.blue : Color.secondary.opacity(0.35), lineWidth: 1.5)
+                        .strokeBorder(session.isCompleted ? Color.ghGreen : Color.secondary.opacity(0.35), lineWidth: 1.5)
                         .frame(width: 20, height: 20)
                     if session.isCompleted {
-                        Circle().fill(Color.blue).frame(width: 20, height: 20)
+                        Circle().fill(Color.ghGreen).frame(width: 20, height: 20)
                         Image(systemName: "checkmark")
                             .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(.white)
@@ -412,7 +412,7 @@ struct SessionRow: View {
             // 날짜
             Text(dayLabel)
                 .font(.system(size: 13, weight: isToday ? .semibold : .regular))
-                .foregroundStyle(isToday ? Color.blue : (isPast && !session.isCompleted ? Color.red.opacity(0.7) : Color.primary))
+                .foregroundStyle(isToday ? Color.ghGreen : (isPast && !session.isCompleted ? Color.red.opacity(0.7) : Color.primary))
                 .frame(width: 90, alignment: .leading)
 
             // 학습량
@@ -429,7 +429,7 @@ struct SessionRow: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(Color.blue)
+                    .background(Color.ghGreen)
                     .clipShape(Capsule())
             } else if isPast && !session.isCompleted {
                 Text("미완료")
@@ -570,7 +570,7 @@ struct AddStudyPlanSheet: View {
                                             .foregroundStyle(selectedProject == nil ? Color.white : Color.secondary)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 6)
-                                            .background(selectedProject == nil ? Color.blue : Color.secondary.opacity(0.1))
+                                            .background(selectedProject == nil ? Color.ghGreen : Color.secondary.opacity(0.1))
                                             .clipShape(Capsule())
                                     }
                                     .buttonStyle(.plain)
@@ -580,13 +580,13 @@ struct AddStudyPlanSheet: View {
                                             selectedProject = project
                                         } label: {
                                             HStack(spacing: 5) {
-                                                Circle().fill(Color(hex: project.colorHex) ?? .blue).frame(width: 7, height: 7)
+                                                Circle().fill(Color(hex: project.colorHex) ?? Color.ghGreen).frame(width: 7, height: 7)
                                                 Text(project.name).font(.system(size: 13))
                                             }
                                             .foregroundStyle(selectedProject?.id == project.id ? Color.white : Color.primary)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 6)
-                                            .background(selectedProject?.id == project.id ? Color.blue : Color.secondary.opacity(0.1))
+                                            .background(selectedProject?.id == project.id ? Color.ghGreen : Color.secondary.opacity(0.1))
                                             .clipShape(Capsule())
                                         }
                                         .buttonStyle(.plain)
@@ -610,7 +610,7 @@ struct AddStudyPlanSheet: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(title.isEmpty ? Color.secondary.opacity(0.3) : Color.blue)
+                    .background(title.isEmpty ? Color.secondary.opacity(0.3) : Color.ghGreen)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
             }
             .buttonStyle(.plain)
